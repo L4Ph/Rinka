@@ -81,6 +81,24 @@ describe("resolveLoaderEnv", () => {
     expect(factory).toHaveBeenCalledWith({ props: { tenant: "a" } });
   });
 
+  it("derives serializable stubs for D1 proxy bindings from ctx.exports", () => {
+    const derived = { query: () => {}, first: () => {} };
+    const factory = vi.fn<(options: { props: Record<string, unknown> }) => typeof derived>(
+      () => derived,
+    );
+    const hostEnv = { USER_DB: { rawPlatformBinding: true } };
+
+    const loaderEnv = resolveLoaderEnv({
+      hostEnv,
+      exports: { D1DbProxy: factory },
+      bindings: [{ name: "USER_DB", mode: "proxy", proxyExport: "D1DbProxy" }],
+      routeId: "users",
+    });
+
+    expect(loaderEnv).toEqual({ USER_DB: derived });
+    expect(factory).toHaveBeenCalledWith({ props: {} });
+  });
+
   it("throws a descriptive error when the proxy export is unavailable", () => {
     expect(() =>
       resolveLoaderEnv({
