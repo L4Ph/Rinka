@@ -1,0 +1,54 @@
+{
+  "name": "hibana",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Opt-in per-route Dynamic Worker (Worker Loader) delegation for Hono apps on Cloudflare Workers",
+  "repository": "github:L4Ph/hibana",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./proxies": {
+      "types": "./src/proxies.ts",
+      "import": "./src/proxies.ts"
+    },
+    "./vite": {
+      "types": "./src/vite/plugin.ts",
+      "import": "./src/vite/plugin.ts"
+    }
+  },
+  "scripts": {
+    "test": "vp test run",
+    "test:watch": "vp test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "oxc-parser": "^0.127.0",
+    "vite-plus": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260426.1",
+    "@types/node": "^24.12.4",
+    "hono": "^4.12.18",
+    "typescript": "^5.9.0",
+    "vite": "catalog:"
+  },
+  "peerDependencies": {
+    "hono": ">=4.0.0"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.9.0",
+      "onFail": "download"
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
