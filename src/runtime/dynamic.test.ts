@@ -223,6 +223,55 @@ describe("dynamic()", () => {
     expect(loaderGet).toHaveBeenCalledOnce();
   });
 
+  it("resolves D1 proxy bindings via executionCtx exports when delegating", async () => {
+    registerDynamicRouteManifest({
+      users: {
+        assetPath: "/dynamic-routes/users.js",
+        bindings: [{ name: "USER_DB", mode: "proxy", proxyExport: "D1DbProxy" }],
+      },
+    });
+
+    const inner = new Hono().get("/", (c) => c.text("inline"));
+    const wrapped = dynamic(inner, { id: "users", bindings: ["USER_DB"] });
+
+    const stub = { query: () => {}, first: () => {} };
+    const factory = vi.fn<(options: { props: Record<string, unknown> }) => typeof stub>(() => stub);
+    const loaderFetch = vi.fn<() => Promise<Response>>(async () => new Response("loaded"));
+    const loaderGet = vi.fn<
+      (
+        id: string | null,
+        getCode: () => HibanaWorkerLoaderWorkerCode,
+      ) => {
+        getEntrypoint: () => { fetch: typeof loaderFetch };
+      }
+    >((_id, getCode) => {
+      expect(getCode().env).toEqual({ USER_DB: stub });
+      return { getEntrypoint: () => ({ fetch: loaderFetch }) };
+    });
+    const loader = { get: loaderGet } as unknown as HibanaWorkerLoader;
+    const assets = {
+      fetch: vi.fn<() => Promise<Response>>(
+        async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
+      ),
+    } as unknown as HibanaFetcher;
+
+    const ctxWithExports = {
+      waitUntil: () => {},
+      passThroughOnException: () => {},
+      exports: { D1DbProxy: factory },
+    } as unknown as ExecutionContext;
+
+    const res = await wrapped.fetch(
+      new Request("http://localhost/"),
+      { LOADER: loader, ASSETS: assets, USER_DB: { rawPlatformBinding: true } },
+      ctxWithExports,
+    );
+
+    expect(await res.text()).toBe("loaded");
+    expect(factory).toHaveBeenCalledWith({ props: {} });
+    expect(loaderGet).toHaveBeenCalledOnce();
+  });
+
   it("returns 502 for proxy bindings when ctx.exports is unavailable", async () => {
     registerDynamicRouteManifest({
       poc: {

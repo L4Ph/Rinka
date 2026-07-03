@@ -203,6 +203,78 @@ export function queueProxy<TEnv extends object>(binding: BindingOfType<TEnv, Que
   };
 }
 
+/** RPC-safe projection of D1Database — D1PreparedStatement cannot cross RPC,
+ * so prepare/bind/run is collapsed into flat query/raw/first methods. */
+export interface D1DatabaseStub {
+  query<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<D1Result<T>>;
+  raw<T = unknown[]>(sql: string, ...params: unknown[]): Promise<T[]>;
+  first<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T | null>;
+  execute(sql: string): Promise<D1ExecResult>;
+  batch<T = unknown>(statements: { sql: string; params: unknown[] }[]): Promise<D1Result<T>[]>;
+}
+
+function isD1DatabaseLike(value: unknown): value is D1Database {
+  return hasMethods(value, ["prepare", "batch", "exec"]);
+}
+
+export function d1DatabaseProxy<TEnv extends object>(binding: BindingOfType<TEnv, D1Database>) {
+  return class extends WorkerEntrypoint<TEnv> implements D1DatabaseStub {
+    #db(): D1Database {
+      return resolveBindingValue(
+        this.env,
+        binding,
+        isD1DatabaseLike,
+        "d1DatabaseProxy",
+        "a D1 database",
+      );
+    }
+
+    async query<T = Record<string, unknown>>(
+      sql: string,
+      ...params: unknown[]
+    ): Promise<D1Result<T>> {
+      let stmt = this.#db().prepare(sql);
+      if (params.length > 0) {
+        stmt = stmt.bind(...params);
+      }
+      return stmt.run<T>();
+    }
+
+    async raw<T = unknown[]>(sql: string, ...params: unknown[]): Promise<T[]> {
+      let stmt = this.#db().prepare(sql);
+      if (params.length > 0) {
+        stmt = stmt.bind(...params);
+      }
+      return stmt.raw<T>();
+    }
+
+    async first<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T | null> {
+      let stmt = this.#db().prepare(sql);
+      if (params.length > 0) {
+        stmt = stmt.bind(...params);
+      }
+      return stmt.first<T>();
+    }
+
+    async execute(sql: string): Promise<D1ExecResult> {
+      return this.#db().exec(sql);
+    }
+
+    async batch<T = unknown>(
+      statements: { sql: string; params: unknown[] }[],
+    ): Promise<D1Result<T>[]> {
+      const stmts = statements.map(({ sql, params }) => {
+        let stmt = this.#db().prepare(sql);
+        if (params.length > 0) {
+          stmt = stmt.bind(...params);
+        }
+        return stmt;
+      });
+      return this.#db().batch<T>(stmts);
+    }
+  };
+}
+
 type AiLike = {
   run(
     model: string,
