@@ -95,4 +95,4 @@ const app = new Hono<{ Bindings: Env }>()
 
 ## Examples
 
-- [`example/`](./example) — a minimal Hono app on Cloudflare Workers with one dynamic route (`/`) and one inline route (`/post/:id`). Run `pnpm install` from the repo root, then `pnpm --filter example dev`.
+- [`example/`](./example) — a Hono app on Cloudflare Workers with dynamic routes (`/`, `/shops/:id`, `/shops/:id/photos/:index`, `/prefectures/:prefecture/shops`) and one inline route (`/about`). Run `pnpm install` from the repo root, then `pnpm --filter example dev`.
