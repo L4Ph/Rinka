@@ -21,12 +21,13 @@ export function findDynamicRouteViolations(
   source: string,
   bindings: string[],
   policies: BindingPolicyMap = defaultBindingPolicies,
+  filename = "module.ts",
 ): DynamicRouteDenyReason[] {
   const violations: DynamicRouteDenyReason[] = [
     ...resolveBindingPolicies(bindings, policies).violations,
   ];
 
-  const program = parseModuleSource(source);
+  const program = parseModuleSource(source, filename);
   let wasm = false;
   let websocket = false;
 
@@ -62,8 +63,9 @@ export function assertDynamicRouteAllowed(
   source: string,
   bindings: string[],
   policies: BindingPolicyMap = defaultBindingPolicies,
+  filename = "module.ts",
 ): void {
-  const violations = findDynamicRouteViolations(source, bindings, policies);
+  const violations = findDynamicRouteViolations(source, bindings, policies, filename);
   if (violations.length === 0) return;
 
   const messages = violations.map((v) => {

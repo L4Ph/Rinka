@@ -122,8 +122,8 @@ function analyzeFunctionBody(body: unknown, ctxName: string): EnvUsageAnalysis {
   return analysis;
 }
 
-function analyzeProgram(source: string): EnvUsageAnalysis {
-  const program = parseModuleSource(source);
+function analyzeProgram(source: string, filename = "module.ts"): EnvUsageAnalysis {
+  const program = parseModuleSource(source, filename);
   const combined: EnvUsageAnalysis = {
     accessed: new Set<string>(),
     unanalyzableEnvPass: false,
@@ -156,8 +156,9 @@ function analyzeProgram(source: string): EnvUsageAnalysis {
 export function assertDeclaredBindingsCoverEnvAccess(
   source: string,
   bindings: readonly string[],
+  filename = "module.ts",
 ): void {
-  const { accessed, unanalyzableEnvPass } = analyzeProgram(source);
+  const { accessed, unanalyzableEnvPass } = analyzeProgram(source, filename);
 
   if (unanalyzableEnvPass && bindings.length === 0) {
     throw new Error(

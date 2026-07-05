@@ -10,7 +10,9 @@ type EstreeCallExpression = {
 };
 
 export function parseModuleSource(source: string, filename = "module.ts"): Program {
-  const result = parseSync(filename, source, { sourceType: "module", lang: "ts" });
+  const ext = filename.split(".").pop();
+  const lang = ext === "tsx" ? "tsx" : ext === "jsx" ? "jsx" : "ts";
+  const result = parseSync(filename, source, { sourceType: "module", lang });
   if (result.errors.length > 0) {
     throw new SyntaxError(result.errors.map((error) => error.message).join("\n"));
   }
