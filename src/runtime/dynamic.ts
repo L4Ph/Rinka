@@ -78,9 +78,7 @@ export function dynamic<T extends HonoType<any, any, any>>(
     }
     return next();
   };
-  // PreparedRegExpRouter compiles `use("*")` as `/mount/*` only; also match the mount root.
   wrapper.use("*", maybeDelegate);
-  wrapper.use("/", maybeDelegate);
   wrapper.route("/", route);
   return wrapper as T;
 }
