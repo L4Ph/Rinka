@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { ErrorBoundary } from "hono/jsx";
 import type { FC } from "hono/jsx";
+import { ShopPhoto } from "../components/shop-photo";
 import { fetchShop } from "../lib/ramen";
 
 const ShopDetail: FC<{ shopId: string }> = async ({ shopId }) => {
@@ -20,13 +21,11 @@ const ShopDetail: FC<{ shopId: string }> = async ({ shopId }) => {
               href={`/shops/${encodeURIComponent(shopId)}/photos/${index}`}
               style="display:block;"
             >
-              <img
-                src={photo.url}
+              <ShopPhoto
+                url={photo.url}
                 alt={photo.name}
                 width={photo.width}
                 height={photo.height}
-                style="max-width:100%;height:auto;border-radius:8px;"
-                loading="lazy"
               />
             </a>
           ))}

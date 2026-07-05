@@ -34,6 +34,12 @@ export type ShopsResponse = {
 
 const BASE_URL = "https://ramen-api.dev";
 
+async function fetchJson<T>(url: string | URL, errorMessage: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${errorMessage}: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchShops(
   page = 1,
   perPage = 100,
@@ -44,19 +50,13 @@ export async function fetchShops(
   url.searchParams.set("perPage", String(perPage));
   if (prefecture) url.searchParams.set("prefecture", prefecture);
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch shops: ${res.status}`);
-  return res.json();
+  return fetchJson(url, "Failed to fetch shops");
 }
 
 export async function fetchShop(id: string): Promise<{ shop: Shop }> {
-  const res = await fetch(`${BASE_URL}/shops/${encodeURIComponent(id)}`);
-  if (!res.ok) throw new Error(`Failed to fetch shop ${id}: ${res.status}`);
-  return res.json();
+  return fetchJson(`${BASE_URL}/shops/${encodeURIComponent(id)}`, `Failed to fetch shop ${id}`);
 }
 
 export async function fetchAuthor(id: string): Promise<{ author: Author }> {
-  const res = await fetch(`${BASE_URL}/authors/${encodeURIComponent(id)}`);
-  if (!res.ok) throw new Error(`Failed to fetch author ${id}: ${res.status}`);
-  return res.json();
+  return fetchJson(`${BASE_URL}/authors/${encodeURIComponent(id)}`, `Failed to fetch author ${id}`);
 }
