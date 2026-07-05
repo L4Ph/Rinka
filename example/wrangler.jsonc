@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "example",
+  "compatibility_date": "2025-08-03",
+  "main": "./src/index.tsx",
+  "worker_loaders": [{ "binding": "LOADER" }],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  }
+}

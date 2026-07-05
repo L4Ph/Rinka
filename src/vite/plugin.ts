@@ -75,6 +75,7 @@ async function bundleDynamicRoute(
       configFile: false,
       root: options.root,
       plugins: [cloudflareShim],
+      publicDir: false,
       build: {
         outDir: options.assetsDir,
         emptyOutDir: false,
@@ -118,8 +119,8 @@ async function runRinkaCodegen(
   const scanned = scanDynamicRoutesInFile(resolved.scanFile, resolved.root, resolved.pathAliases);
   const manifestRoutes = scanned.map((route) => {
     const source = readFileSync(route.modulePath, "utf8");
-    assertDeclaredBindingsCoverEnvAccess(source, route.bindings);
-    assertDynamicRouteAllowed(source, route.bindings, resolved.bindingPolicies);
+    assertDeclaredBindingsCoverEnvAccess(source, route.bindings, route.modulePath);
+    assertDynamicRouteAllowed(source, route.bindings, resolved.bindingPolicies, route.modulePath);
     // assertDynamicRouteAllowed already rejected unregistered/forbidden bindings.
     const { resolved: resolvedBindings } = resolveBindingPolicies(
       route.bindings,

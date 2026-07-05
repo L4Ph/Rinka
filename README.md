@@ -92,3 +92,7 @@ const app = new Hono<{ Bindings: Env }>()
 ```
 
 `bindings` is typed as keys of the route's `Bindings`, and an AST pass verifies the declared list covers every `c.env.*` access in the route module.
+
+## Examples
+
+- [`example/`](./example) — a Hono app on Cloudflare Workers with dynamic routes (`/`, `/shops/:id`, `/shops/:id/photos/:index`, `/prefectures/:prefecture/shops`) and one inline route (`/about`). Run `pnpm install` from the repo root, then `pnpm --filter example dev`.

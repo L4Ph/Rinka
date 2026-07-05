@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { statSync } from "node:fs";
 import { resolve } from "node:path";
 
 const EXTENSIONS = [".ts", ".tsx", ".mts", ".js", ".jsx", ".mjs"];
@@ -29,7 +29,11 @@ export function resolveModuleFile(
   ];
 
   for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
+    try {
+      if (statSync(candidate).isFile()) return candidate;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    }
   }
 
   throw new Error(
