@@ -67,8 +67,18 @@ function isKvNamespaceLike(value: unknown): value is KVNamespace {
   return hasMethods(value, ["get", "put"]);
 }
 
-export function kvNamespaceProxy<TEnv extends object>(binding: BindingOfType<TEnv, KVNamespace>) {
-  return class extends WorkerEntrypoint<TEnv> implements KvNamespaceStub {
+export declare class KvNamespaceProxy<TEnv extends object>
+  extends WorkerEntrypoint<TEnv>
+  implements KvNamespaceStub
+{
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string, options?: KVNamespacePutOptions): Promise<void>;
+}
+
+export function kvNamespaceProxy<TEnv extends object>(
+  binding: BindingOfType<TEnv, KVNamespace>,
+): typeof KvNamespaceProxy<TEnv> {
+  class KvNamespaceProxyImpl extends WorkerEntrypoint<TEnv> implements KvNamespaceStub {
     #namespace(): KVNamespace {
       return resolveBindingValue(
         this.env,
@@ -86,7 +96,8 @@ export function kvNamespaceProxy<TEnv extends object>(binding: BindingOfType<TEn
     async put(key: string, value: string, options?: KVNamespacePutOptions): Promise<void> {
       return this.#namespace().put(key, value, options);
     }
-  };
+  }
+  return KvNamespaceProxyImpl as unknown as typeof KvNamespaceProxy<TEnv>;
 }
 
 /** RPC-safe projection of R2Object — platform classes cannot cross RPC. */
@@ -137,8 +148,24 @@ function toR2ObjectStub(object: R2Object): R2ObjectStub {
   };
 }
 
-export function r2BucketProxy<TEnv extends object>(binding: BindingOfType<TEnv, R2Bucket>) {
-  return class extends WorkerEntrypoint<TEnv> implements R2BucketStub {
+export declare class R2BucketProxy<TEnv extends object>
+  extends WorkerEntrypoint<TEnv>
+  implements R2BucketStub
+{
+  get(key: string): Promise<R2ObjectBodyStub | null>;
+  head(key: string): Promise<R2ObjectStub | null>;
+  put(
+    key: string,
+    value: ArrayBuffer | ArrayBufferView | string,
+    options?: { httpMetadata?: R2HTTPMetadata; customMetadata?: Record<string, string> },
+  ): Promise<void>;
+  delete(keys: string | string[]): Promise<void>;
+}
+
+export function r2BucketProxy<TEnv extends object>(
+  binding: BindingOfType<TEnv, R2Bucket>,
+): typeof R2BucketProxy<TEnv> {
+  class R2BucketProxyImpl extends WorkerEntrypoint<TEnv> implements R2BucketStub {
     #bucket(): R2Bucket {
       return resolveBindingValue(
         this.env,
@@ -171,7 +198,8 @@ export function r2BucketProxy<TEnv extends object>(binding: BindingOfType<TEnv, 
     async delete(keys: string | string[]): Promise<void> {
       await this.#bucket().delete(keys);
     }
-  };
+  }
+  return R2BucketProxyImpl as unknown as typeof R2BucketProxy<TEnv>;
 }
 
 /** The Queue capability a dynamic route receives (duck-type compatible with Queue). */
@@ -184,8 +212,21 @@ function isQueueLike(value: unknown): value is Queue<unknown> {
   return hasMethods(value, ["send", "sendBatch"]);
 }
 
-export function queueProxy<TEnv extends object>(binding: BindingOfType<TEnv, Queue<unknown>>) {
-  return class extends WorkerEntrypoint<TEnv> implements QueueStub {
+export declare class QueueProxy<TEnv extends object>
+  extends WorkerEntrypoint<TEnv>
+  implements QueueStub
+{
+  send(message: unknown, options?: QueueSendOptions): Promise<void>;
+  sendBatch(
+    messages: MessageSendRequest<unknown>[],
+    options?: QueueSendBatchOptions,
+  ): Promise<void>;
+}
+
+export function queueProxy<TEnv extends object>(
+  binding: BindingOfType<TEnv, Queue<unknown>>,
+): typeof QueueProxy<TEnv> {
+  class QueueProxyImpl extends WorkerEntrypoint<TEnv> implements QueueStub {
     #queue(): Queue<unknown> {
       return resolveBindingValue(this.env, binding, isQueueLike, "queueProxy", "a Queue producer");
     }
@@ -200,7 +241,8 @@ export function queueProxy<TEnv extends object>(binding: BindingOfType<TEnv, Que
     ): Promise<void> {
       await this.#queue().sendBatch(messages, options);
     }
-  };
+  }
+  return QueueProxyImpl as unknown as typeof QueueProxy<TEnv>;
 }
 
 /** RPC-safe projection of D1Database — D1PreparedStatement cannot cross RPC,
@@ -217,8 +259,21 @@ function isD1DatabaseLike(value: unknown): value is D1Database {
   return hasMethods(value, ["prepare", "batch", "exec"]);
 }
 
-export function d1DatabaseProxy<TEnv extends object>(binding: BindingOfType<TEnv, D1Database>) {
-  return class extends WorkerEntrypoint<TEnv> implements D1DatabaseStub {
+export declare class D1DatabaseProxy<TEnv extends object>
+  extends WorkerEntrypoint<TEnv>
+  implements D1DatabaseStub
+{
+  query<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<D1Result<T>>;
+  raw<T = unknown[]>(sql: string, ...params: unknown[]): Promise<T[]>;
+  first<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T | null>;
+  execute(sql: string): Promise<D1ExecResult>;
+  batch<T = unknown>(statements: { sql: string; params: unknown[] }[]): Promise<D1Result<T>[]>;
+}
+
+export function d1DatabaseProxy<TEnv extends object>(
+  binding: BindingOfType<TEnv, D1Database>,
+): typeof D1DatabaseProxy<TEnv> {
+  class D1DatabaseProxyImpl extends WorkerEntrypoint<TEnv> implements D1DatabaseStub {
     #db(): D1Database {
       return resolveBindingValue(
         this.env,
@@ -272,7 +327,8 @@ export function d1DatabaseProxy<TEnv extends object>(binding: BindingOfType<TEnv
       });
       return this.#db().batch<T>(stmts);
     }
-  };
+  }
+  return D1DatabaseProxyImpl as unknown as typeof D1DatabaseProxy<TEnv>;
 }
 
 type AiLike = {
@@ -301,8 +357,22 @@ function isAiLike(value: unknown): value is AiLike {
   return hasMethods(value, ["run", "gateway"]);
 }
 
-export function workersAiProxy<TEnv extends object>(binding: BindingOfType<TEnv, Ai>) {
-  return class extends WorkerEntrypoint<TEnv> implements WorkersAiStub {
+export declare class WorkersAiProxy<TEnv extends object>
+  extends WorkerEntrypoint<TEnv>
+  implements WorkersAiStub
+{
+  run(
+    model: string,
+    inputs: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<unknown>;
+  gatewayUrl(gatewayId: string, provider?: string): Promise<string>;
+}
+
+export function workersAiProxy<TEnv extends object>(
+  binding: BindingOfType<TEnv, Ai>,
+): typeof WorkersAiProxy<TEnv> {
+  class WorkersAiProxyImpl extends WorkerEntrypoint<TEnv> implements WorkersAiStub {
     #ai(): AiLike {
       return resolveBindingValue(
         this.env,
@@ -324,5 +394,6 @@ export function workersAiProxy<TEnv extends object>(binding: BindingOfType<TEnv,
     async gatewayUrl(gatewayId: string, provider?: string): Promise<string> {
       return this.#ai().gateway(gatewayId).getUrl(provider);
     }
-  };
+  }
+  return WorkersAiProxyImpl as unknown as typeof WorkersAiProxy<TEnv>;
 }

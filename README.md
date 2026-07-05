@@ -31,12 +31,12 @@ Worker Loader serializes the dynamic Worker's `env`. Only two kinds of values su
 
 Platform bindings (KV / R2 / D1 / Queues / AI / DO namespaces) are **not** structured-clonable. rinka therefore requires every binding a dynamic route declares to be classified with a `BindingPolicy`:
 
-| mode | delivery |
-| --- | --- |
-| `primitive` | copied as-is (structured clone) |
-| `service` | Service Binding stub, passed as-is |
-| `proxy` | derived stub of a host-exported `WorkerEntrypoint` proxy class, via `ctx.exports.Proxy({ props })` |
-| `forbidden` | build error with a reason |
+| mode        | delivery                                                                                           |
+| ----------- | -------------------------------------------------------------------------------------------------- |
+| `primitive` | copied as-is (structured clone)                                                                    |
+| `service`   | Service Binding stub, passed as-is                                                                 |
+| `proxy`     | derived stub of a host-exported `WorkerEntrypoint` proxy class, via `ctx.exports.Proxy({ props })` |
+| `forbidden` | build error with a reason                                                                          |
 
 Policies are resolved **at build time** and baked into the generated manifest, so what was validated is exactly what runs — there is no runtime registry to drift.
 
@@ -47,7 +47,7 @@ Policies are resolved **at build time** and baked into the generated manifest, s
 ```jsonc
 {
   "worker_loaders": [{ "binding": "LOADER" }],
-  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true }
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
 }
 ```
 
@@ -69,7 +69,7 @@ rinkaVitePlugin({
     MY_SERVICE: { mode: "service" },
     MY_SECRET: { mode: "primitive" },
   }),
-})
+});
 ```
 
 `defineBindingPolicies<Env>` constrains the keys to your `Env`, so a typo'd binding name fails typecheck. A binding declared by a route without a registered policy fails the build.
