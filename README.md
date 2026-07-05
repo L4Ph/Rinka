@@ -1,4 +1,6 @@
-# hibana
+# rinka
+
+> **rinka** (燐火) — Japanese for "will-o'-the-wisp" / "phosphorescent flame". Each route is a small flame that lights up on demand inside its own isolated Worker.
 
 Opt-in, per-route [Dynamic Worker](https://developers.cloudflare.com/dynamic-workers/) (Worker Loader) delegation for [Hono](https://hono.dev/) apps on Cloudflare Workers.
 
@@ -16,9 +18,9 @@ Request
   → inline route    → normal handler
 ```
 
-- **`hibana`** — runtime: `dynamic()` wrapper, manifest registry, `resolveLoaderEnv()`. No `cloudflare:workers` import; safe to load anywhere.
-- **`hibana/proxies`** — typed `WorkerEntrypoint` proxy factories for platform bindings. workerd-only.
-- **`hibana/vite`** — the build plugin: AST scan of `dynamic()` calls, per-route bundling into assets, manifest codegen, binding-policy validation, and `PreparedRegExpRouter` init codegen.
+- **`rinka`** — runtime: `dynamic()` wrapper, manifest registry, `resolveLoaderEnv()`. No `cloudflare:workers` import; safe to load anywhere.
+- **`rinka/proxies`** — typed `WorkerEntrypoint` proxy factories for platform bindings. workerd-only.
+- **`rinka/vite`** — the build plugin: AST scan of `dynamic()` calls, per-route bundling into assets, manifest codegen, binding-policy validation, and `PreparedRegExpRouter` init codegen.
 
 ### The binding model
 
@@ -27,7 +29,7 @@ Worker Loader serializes the dynamic Worker's `env`. Only two kinds of values su
 1. structured-clonable values (string vars, plain objects)
 2. Service Binding stubs
 
-Platform bindings (KV / R2 / D1 / Queues / AI / DO namespaces) are **not** structured-clonable. hibana therefore requires every binding a dynamic route declares to be classified with a `BindingPolicy`:
+Platform bindings (KV / R2 / D1 / Queues / AI / DO namespaces) are **not** structured-clonable. rinka therefore requires every binding a dynamic route declares to be classified with a `BindingPolicy`:
 
 | mode | delivery |
 | --- | --- |
@@ -52,10 +54,10 @@ Policies are resolved **at build time** and baked into the generated manifest, s
 ### 2. vite.config.ts
 
 ```ts
-import { defineBindingPolicies } from "hibana";
-import { hibanaVitePlugin } from "hibana/vite";
+import { defineBindingPolicies } from "rinka";
+import { rinkaVitePlugin } from "rinka/vite";
 
-hibanaVitePlugin({
+rinkaVitePlugin({
   root: __dirname,
   appEntry: "src/index.ts",
   scanFile: "src/routes/index.ts",
@@ -75,7 +77,7 @@ hibanaVitePlugin({
 ### 3. Export proxy classes from the Worker entry
 
 ```ts
-import { kvNamespaceProxy } from "hibana/proxies";
+import { kvNamespaceProxy } from "rinka/proxies";
 
 export class MyKvProxy extends kvNamespaceProxy<Env>("MY_KV") {}
 ```
@@ -83,7 +85,7 @@ export class MyKvProxy extends kvNamespaceProxy<Env>("MY_KV") {}
 ### 4. Wrap routes
 
 ```ts
-import { dynamic } from "hibana";
+import { dynamic } from "rinka";
 
 const app = new Hono<{ Bindings: Env }>()
   .route("/api", dynamic(apiRoute, { id: "api", bindings: ["MY_KV"] }))
@@ -91,4 +93,3 @@ const app = new Hono<{ Bindings: Env }>()
 ```
 
 `bindings` is typed as keys of the route's `Bindings`, and an AST pass verifies the declared list covers every `c.env.*` access in the route module.
-

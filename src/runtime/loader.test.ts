@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type {
-  HibanaFetcher,
-  HibanaWorkerLoader,
-  HibanaWorkerLoaderWorkerCode,
+  RinkaFetcher,
+  RinkaWorkerLoader,
+  RinkaWorkerLoaderWorkerCode,
 } from "../cloudflare-types";
 import {
   clearDynamicRouteModuleCacheForTests,
@@ -134,7 +134,7 @@ describe("delegateDynamicRouteFetch", () => {
     const loaderGet = vi.fn<
       (
         id: string | null,
-        getCode: () => HibanaWorkerLoaderWorkerCode,
+        getCode: () => RinkaWorkerLoaderWorkerCode,
       ) => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
@@ -146,17 +146,17 @@ describe("delegateDynamicRouteFetch", () => {
         getEntrypoint: () => ({ fetch: loaderFetch }),
       };
     });
-    const loader = { get: loaderGet } as unknown as HibanaWorkerLoader;
+    const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
     const assetsFetch = vi.fn<(input: URL) => Promise<Response>>(
       async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
     );
-    const assets = { fetch: assetsFetch } as unknown as HibanaFetcher;
+    const assets = { fetch: assetsFetch } as unknown as RinkaFetcher;
 
     const res = await delegateDynamicRouteFetch({
       request: new Request("http://localhost/ping"),
       env: { LOADER: loader, ASSETS: assets } as LoaderCapableEnv & {
-        LOADER: HibanaWorkerLoader;
-        ASSETS: HibanaFetcher;
+        LOADER: RinkaWorkerLoader;
+        ASSETS: RinkaFetcher;
       },
       routeId: "ping",
       entry,
@@ -175,8 +175,8 @@ describe("delegateDynamicRouteFetch", () => {
     await delegateDynamicRouteFetch({
       request: new Request("http://localhost/ping"),
       env: { LOADER: loader, ASSETS: assets } as LoaderCapableEnv & {
-        LOADER: HibanaWorkerLoader;
-        ASSETS: HibanaFetcher;
+        LOADER: RinkaWorkerLoader;
+        ASSETS: RinkaFetcher;
       },
       routeId: "ping",
       entry,
@@ -193,13 +193,13 @@ describe("delegateDynamicRouteFetch", () => {
     const assetsFetch = vi.fn<() => Promise<Response>>(
       async () => new Response("missing", { status: 404 }),
     );
-    const assets = { fetch: assetsFetch } as unknown as HibanaFetcher;
+    const assets = { fetch: assetsFetch } as unknown as RinkaFetcher;
     const inlineFetch = vi.fn<() => Promise<Response>>(async () => new Response("inline"));
     const loaderGet = vi.fn<() => { getEntrypoint: () => { fetch: () => Promise<Response> } }>();
 
     const blocked = await delegateDynamicRouteFetch({
       request: new Request("http://localhost/ping"),
-      env: { LOADER: { get: loaderGet } as unknown as HibanaWorkerLoader, ASSETS: assets },
+      env: { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader, ASSETS: assets },
       routeId: "ping",
       entry,
       inlineFetch,
@@ -210,7 +210,7 @@ describe("delegateDynamicRouteFetch", () => {
     inlineFetch.mockClear();
     const fallback = await delegateDynamicRouteFetch({
       request: new Request("http://localhost/ping"),
-      env: { LOADER: { get: loaderGet } as unknown as HibanaWorkerLoader, ASSETS: assets },
+      env: { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader, ASSETS: assets },
       routeId: "ping-fallback",
       entry: { ...entry, assetPath: "/dynamic-routes/ping-fallback.js" },
       inlineFetch,
@@ -231,7 +231,7 @@ describe("delegateDynamicRouteFetch", () => {
     const loaderGet = vi.fn<
       (
         id: string | null,
-        getCode: () => HibanaWorkerLoaderWorkerCode,
+        getCode: () => RinkaWorkerLoaderWorkerCode,
       ) => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
@@ -243,12 +243,12 @@ describe("delegateDynamicRouteFetch", () => {
       fetch: vi.fn<() => Promise<Response>>(
         async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
       ),
-    } as unknown as HibanaFetcher;
+    } as unknown as RinkaFetcher;
 
     const res = await delegateDynamicRouteFetch({
       request: new Request("http://localhost/poc"),
       env: {
-        LOADER: { get: loaderGet } as unknown as HibanaWorkerLoader,
+        LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader,
         ASSETS: assets,
         RATE_LIMIT_KV: { rawPlatformBinding: true },
       },
@@ -274,11 +274,11 @@ describe("delegateDynamicRouteFetch", () => {
       fetch: vi.fn<() => Promise<Response>>(
         async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
       ),
-    } as unknown as HibanaFetcher;
+    } as unknown as RinkaFetcher;
 
     const res = await delegateDynamicRouteFetch({
       request: new Request("http://localhost/ping"),
-      env: { LOADER: { get: loaderGet } as unknown as HibanaWorkerLoader, ASSETS: assets },
+      env: { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader, ASSETS: assets },
       routeId: "ping",
       entry,
       inlineFetch: async () => new Response("inline"),
@@ -288,7 +288,7 @@ describe("delegateDynamicRouteFetch", () => {
     expect(res.status).toBe(502);
     expect(loaderGet).not.toHaveBeenCalled();
     expect(logError).toHaveBeenCalledWith(
-      "hibana: failed to resolve loader env",
+      "rinka: failed to resolve loader env",
       expect.objectContaining({ routeId: "ping" }),
     );
   });

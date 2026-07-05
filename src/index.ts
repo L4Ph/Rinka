@@ -21,12 +21,12 @@ export {
   type ResolveLoaderEnvParams,
 } from "./runtime/loader";
 export type {
-  HibanaCtxExports,
-  HibanaExecutionContext,
-  HibanaFetcher,
-  HibanaLoopbackFactory,
-  HibanaWorkerLoader,
-  HibanaWorkerLoaderEntrypoint,
-  HibanaWorkerLoaderStub,
-  HibanaWorkerLoaderWorkerCode,
+  RinkaCtxExports,
+  RinkaExecutionContext,
+  RinkaFetcher,
+  RinkaLoopbackFactory,
+  RinkaWorkerLoader,
+  RinkaWorkerLoaderEntrypoint,
+  RinkaWorkerLoaderStub,
+  RinkaWorkerLoaderWorkerCode,
 } from "./cloudflare-types";

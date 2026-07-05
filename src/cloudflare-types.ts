@@ -1,6 +1,6 @@
-/** Minimal Cloudflare runtime shapes for hibana (avoid pulling workers-types into backend). */
+/** Minimal Cloudflare runtime shapes for rinka (avoid pulling workers-types into backend). */
 
-export type HibanaWorkerLoaderWorkerCode = {
+export type RinkaWorkerLoaderWorkerCode = {
   compatibilityDate: string;
   compatibilityFlags?: string[];
   mainModule: string;
@@ -9,19 +9,19 @@ export type HibanaWorkerLoaderWorkerCode = {
   globalOutbound: null;
 };
 
-export type HibanaWorkerLoaderEntrypoint = {
+export type RinkaWorkerLoaderEntrypoint = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
 };
 
-export type HibanaWorkerLoaderStub = {
-  getEntrypoint(): HibanaWorkerLoaderEntrypoint;
+export type RinkaWorkerLoaderStub = {
+  getEntrypoint(): RinkaWorkerLoaderEntrypoint;
 };
 
-export type HibanaWorkerLoader = {
-  get(id: string | null, getCode: () => HibanaWorkerLoaderWorkerCode): HibanaWorkerLoaderStub;
+export type RinkaWorkerLoader = {
+  get(id: string | null, getCode: () => RinkaWorkerLoaderWorkerCode): RinkaWorkerLoaderStub;
 };
 
-export type HibanaFetcher = {
+export type RinkaFetcher = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
 };
 
@@ -30,11 +30,11 @@ export type HibanaFetcher = {
  * Callable to derive a stub with caller-specified `ctx.props` (requires the
  * `enable_ctx_exports` compatibility flag on the host Worker).
  */
-export type HibanaLoopbackFactory = (options: { props: Record<string, unknown> }) => unknown;
+export type RinkaLoopbackFactory = (options: { props: Record<string, unknown> }) => unknown;
 
-/** Minimal shape of `ExecutionContext.exports` used by hibana. */
-export type HibanaCtxExports = Record<string, unknown>;
+/** Minimal shape of `ExecutionContext.exports` used by rinka. */
+export type RinkaCtxExports = Record<string, unknown>;
 
-export type HibanaExecutionContext = {
-  exports?: HibanaCtxExports;
+export type RinkaExecutionContext = {
+  exports?: RinkaCtxExports;
 };

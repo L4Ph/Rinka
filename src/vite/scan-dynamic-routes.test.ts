@@ -13,7 +13,7 @@ describe("scanDynamicRoutes", () => {
   it("finds dynamic route registrations and resolves module paths", () => {
     const source = `
       import { healthRoute } from "./health-route";
-      import { dynamic } from "hibana";
+      import { dynamic } from "rinka";
       export const v1 = new Hono().route("/health", dynamic(healthRoute, { id: "health", bindings: [] }));
     `;
     const routes = scanDynamicRoutes(source, backendV1Index, backendV1Dir);
@@ -27,7 +27,7 @@ describe("scanDynamicRoutes", () => {
   it("accepts options keys in any order", () => {
     const source = `
       import { healthRoute } from "./health-route";
-      import { dynamic } from "hibana";
+      import { dynamic } from "rinka";
       export const v1 = new Hono().route(
         "/health",
         dynamic(healthRoute, { bindings: ["RATE_LIMIT_KV"], id: "health" }),
@@ -40,7 +40,7 @@ describe("scanDynamicRoutes", () => {
   it("throws when dynamic calls are not fully parsed", () => {
     const source = `
       import { healthRoute } from "./health-route";
-      import { dynamic } from "hibana";
+      import { dynamic } from "rinka";
       dynamic(healthRoute, { id: "health" });
     `;
     expect(() => scanDynamicRoutes(source, backendV1Index, backendV1Dir)).toThrow(

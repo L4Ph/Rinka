@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type {
-  HibanaFetcher,
-  HibanaWorkerLoader,
-  HibanaWorkerLoaderWorkerCode,
+  RinkaFetcher,
+  RinkaWorkerLoader,
+  RinkaWorkerLoaderWorkerCode,
 } from "../cloudflare-types";
 import {
   clearDynamicRouteModuleCacheForTests,
@@ -46,18 +46,18 @@ describe("dynamic()", () => {
     const loaderGet = vi.fn<
       (
         id: string | null,
-        getCode: () => HibanaWorkerLoaderWorkerCode,
+        getCode: () => RinkaWorkerLoaderWorkerCode,
       ) => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
     >((_id, _getCode) => ({
       getEntrypoint: () => ({ fetch: loaderFetch }),
     }));
-    const loader = { get: loaderGet } as unknown as HibanaWorkerLoader;
+    const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
     const assetsFetch = vi.fn<() => Promise<Response>>(
       async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
     );
-    const assets = { fetch: assetsFetch } as unknown as HibanaFetcher;
+    const assets = { fetch: assetsFetch } as unknown as RinkaFetcher;
 
     const env = {
       LOADER: loader,
@@ -93,19 +93,19 @@ describe("dynamic()", () => {
     const loaderGet = vi.fn<
       (
         id: string | null,
-        getCode: () => HibanaWorkerLoaderWorkerCode,
+        getCode: () => RinkaWorkerLoaderWorkerCode,
       ) => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
     >((_id, _getCode) => ({
       getEntrypoint: () => ({ fetch: loaderFetch }),
     }));
-    const loader = { get: loaderGet } as unknown as HibanaWorkerLoader;
+    const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
     const assets = {
       fetch: vi.fn<() => Promise<Response>>(
         async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
       ),
-    } as unknown as HibanaFetcher;
+    } as unknown as RinkaFetcher;
 
     const res = await app.fetch(
       new Request("http://localhost/v1/health"),
@@ -141,19 +141,19 @@ describe("dynamic()", () => {
     const loaderGet = vi.fn<
       (
         id: string | null,
-        getCode: () => HibanaWorkerLoaderWorkerCode,
+        getCode: () => RinkaWorkerLoaderWorkerCode,
       ) => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
     >((_id, _getCode) => ({
       getEntrypoint: () => ({ fetch: loaderFetch }),
     }));
-    const loader = { get: loaderGet } as unknown as HibanaWorkerLoader;
+    const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
     const assets = {
       fetch: vi.fn<() => Promise<Response>>(
         async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
       ),
-    } as unknown as HibanaFetcher;
+    } as unknown as RinkaFetcher;
 
     const res = await app.fetch(
       new Request("http://localhost/v1/health", {
@@ -191,7 +191,7 @@ describe("dynamic()", () => {
     const loaderGet = vi.fn<
       (
         id: string | null,
-        getCode: () => HibanaWorkerLoaderWorkerCode,
+        getCode: () => RinkaWorkerLoaderWorkerCode,
       ) => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
@@ -199,12 +199,12 @@ describe("dynamic()", () => {
       expect(getCode().env).toEqual({ RATE_LIMIT_KV: stub });
       return { getEntrypoint: () => ({ fetch: loaderFetch }) };
     });
-    const loader = { get: loaderGet } as unknown as HibanaWorkerLoader;
+    const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
     const assets = {
       fetch: vi.fn<() => Promise<Response>>(
         async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
       ),
-    } as unknown as HibanaFetcher;
+    } as unknown as RinkaFetcher;
 
     const ctxWithExports = {
       waitUntil: () => {},
@@ -240,7 +240,7 @@ describe("dynamic()", () => {
     const loaderGet = vi.fn<
       (
         id: string | null,
-        getCode: () => HibanaWorkerLoaderWorkerCode,
+        getCode: () => RinkaWorkerLoaderWorkerCode,
       ) => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
@@ -248,12 +248,12 @@ describe("dynamic()", () => {
       expect(getCode().env).toEqual({ USER_DB: stub });
       return { getEntrypoint: () => ({ fetch: loaderFetch }) };
     });
-    const loader = { get: loaderGet } as unknown as HibanaWorkerLoader;
+    const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
     const assets = {
       fetch: vi.fn<() => Promise<Response>>(
         async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
       ),
-    } as unknown as HibanaFetcher;
+    } as unknown as RinkaFetcher;
 
     const ctxWithExports = {
       waitUntil: () => {},
@@ -292,12 +292,12 @@ describe("dynamic()", () => {
         fetch: vi.fn<() => Promise<Response>>(async () => new Response("loaded")),
       }),
     }));
-    const loader = { get: loaderGet } as unknown as HibanaWorkerLoader;
+    const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
     const assets = {
       fetch: vi.fn<() => Promise<Response>>(
         async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
       ),
-    } as unknown as HibanaFetcher;
+    } as unknown as RinkaFetcher;
 
     const res = await wrapped.fetch(
       new Request("http://localhost/"),
@@ -329,10 +329,10 @@ describe("dynamic()", () => {
         fetch: vi.fn<() => Promise<Response>>(async () => new Response("loaded")),
       }),
     }));
-    const loader = { get: loaderGet } as unknown as HibanaWorkerLoader;
+    const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
     const assets = {
       fetch: vi.fn<() => Promise<Response>>(async () => new Response("missing", { status: 404 })),
-    } as unknown as HibanaFetcher;
+    } as unknown as RinkaFetcher;
 
     const res = await wrapped.fetch(
       new Request("http://localhost/ping"),

@@ -3,7 +3,7 @@
  *
  * Worker Loader serializes the dynamic Worker's `env`; platform bindings
  * (KV / R2 / Queue / AI) are not structured-clonable, so the host exports a
- * proxy class per binding and hibana passes a derived `ctx.exports` stub
+ * proxy class per binding and rinka passes a derived `ctx.exports` stub
  * (`ctx.exports.Proxy({ props })` — the bare loopback object doesn't survive
  * env serialization) into the loader env instead. Each factory returns a
  * class bound to ONE env binding, checked at compile time: the `binding`
@@ -21,7 +21,7 @@
  * — deliberately narrower than the native binding type.
  *
  * This module imports `cloudflare:workers` and is workerd-only; import it
- * from Worker code, never from build/node code (use `hibana` / `hibana/vite`
+ * from Worker code, never from build/node code (use `rinka` / `rinka/vite`
  * there).
  */
 import { WorkerEntrypoint } from "cloudflare:workers";

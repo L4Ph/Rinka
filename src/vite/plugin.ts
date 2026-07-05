@@ -15,7 +15,7 @@ import { scanDynamicRoutesInFile, type ScannedDynamicRoute } from "./scan-dynami
 import { assertProxyExportsExist } from "./validate-proxy-exports";
 import { assertDeclaredBindingsCoverEnvAccess } from "./validate-route-bindings";
 
-export type HibanaVitePluginOptions = {
+export type RinkaVitePluginOptions = {
   root: string;
   appEntry: string;
   appExport?: string;
@@ -29,7 +29,7 @@ export type HibanaVitePluginOptions = {
   pathAliases?: Record<string, string>;
   /**
    * Classification of every binding dynamic routes may declare, merged over
-   * hibana's defaults (IMAGES forbidden). A declared binding without a policy
+   * rinka's defaults (IMAGES forbidden). A declared binding without a policy
    * fails the build — Worker Loader envs only accept structured-clonable
    * values and Service Binding stubs, so each binding must state how it is
    * delivered (primitive / service / proxy / forbidden).
@@ -67,7 +67,7 @@ function relativeImport(fromDir: string, modulePath: string): string {
 
 async function bundleDynamicRoute(
   route: ScannedDynamicRoute,
-  options: Required<Pick<HibanaVitePluginOptions, "root" | "assetsDir" | "entryDir">>,
+  options: Required<Pick<RinkaVitePluginOptions, "root" | "assetsDir" | "entryDir">>,
 ): Promise<void> {
   const entryFile = resolve(options.entryDir, `${route.id}.ts`);
   const moduleImportPath = relativeImport(dirname(entryFile), route.modulePath);
@@ -96,7 +96,7 @@ async function bundleDynamicRoute(
   }
 }
 
-function resolveOptions(options: HibanaVitePluginOptions) {
+function resolveOptions(options: RinkaVitePluginOptions) {
   const root = options.root;
   return {
     root,
@@ -114,9 +114,9 @@ function resolveOptions(options: HibanaVitePluginOptions) {
   };
 }
 
-async function runHibanaCodegen(
+async function runRinkaCodegen(
   ctx: { info: (msg: string) => void },
-  options: HibanaVitePluginOptions,
+  options: RinkaVitePluginOptions,
   cacheDevServer: boolean,
 ): Promise<void> {
   const resolved = resolveOptions(options);
@@ -129,7 +129,7 @@ async function runHibanaCodegen(
     cacheDevServer,
   });
   if (writeIfChanged(resolved.routerInitOut, routerInit)) {
-    ctx.info("[hibana] regenerated router init");
+    ctx.info("[rinka] regenerated router init");
   }
 
   const scanned = scanDynamicRoutesInFile(resolved.scanFile, resolved.root, resolved.pathAliases);
@@ -153,7 +153,7 @@ async function runHibanaCodegen(
 
   const manifestSource = formatDynamicManifestSource(manifestRoutes, resolved.assetsBasePath);
   if (writeIfChanged(resolved.manifestOut, manifestSource)) {
-    ctx.info("[hibana] regenerated dynamic route manifest");
+    ctx.info("[rinka] regenerated dynamic route manifest");
   }
 
   mkdirSync(resolved.assetsDir, { recursive: true });
@@ -167,14 +167,14 @@ async function runHibanaCodegen(
   }
 }
 
-export function hibanaVitePlugin(options: HibanaVitePluginOptions): Plugin {
+export function rinkaVitePlugin(options: RinkaVitePluginOptions): Plugin {
   return {
-    name: "hibana",
+    name: "rinka",
     buildStart() {
-      return runHibanaCodegen(this, options, false);
+      return runRinkaCodegen(this, options, false);
     },
     configureServer() {
-      return runHibanaCodegen(this, options, true);
+      return runRinkaCodegen(this, options, true);
     },
   };
 }

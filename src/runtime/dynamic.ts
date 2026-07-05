@@ -1,9 +1,9 @@
 import { Hono, type Context, type Hono as HonoType, type Next } from "hono";
 import type {
-  HibanaCtxExports,
-  HibanaExecutionContext,
-  HibanaFetcher,
-  HibanaWorkerLoader,
+  RinkaCtxExports,
+  RinkaExecutionContext,
+  RinkaFetcher,
+  RinkaWorkerLoader,
 } from "../cloudflare-types";
 import {
   delegateDynamicRouteFetch,
@@ -41,9 +41,9 @@ function rewriteRequestForMount(request: Request, mountPrefix: string): Request 
 // (e.g. `app.request()` in tests). `exports` itself is also absent unless the
 // host runs with the `enable_ctx_exports` compatibility flag — proxy-mode
 // bindings surface a descriptive error from resolveLoaderEnv in that case.
-function getCtxExports(c: Context): HibanaCtxExports | undefined {
+function getCtxExports(c: Context): RinkaCtxExports | undefined {
   try {
-    return (c.executionCtx as HibanaExecutionContext).exports;
+    return (c.executionCtx as RinkaExecutionContext).exports;
   } catch {
     return undefined;
   }
@@ -63,7 +63,7 @@ export function dynamic<T extends HonoType<any, any, any>>(
       const request = rewriteRequestForMount(c.req.raw, mountPrefix);
       return delegateDynamicRouteFetch({
         request,
-        env: env as LoaderCapableEnv & { LOADER: HibanaWorkerLoader; ASSETS: HibanaFetcher },
+        env: env as LoaderCapableEnv & { LOADER: RinkaWorkerLoader; ASSETS: RinkaFetcher },
         exports: getCtxExports(c),
         routeId: options.id,
         entry,

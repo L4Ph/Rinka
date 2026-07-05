@@ -30,6 +30,6 @@ export function assertProxyExportsExist(params: {
   }
   if (missing.length === 0) return;
   throw new Error(
-    `hibana: ctx.exports proxy classes missing from ${params.entryPath} top-level exports:\n- ${missing.join("\n- ")}`,
+    `rinka: ctx.exports proxy classes missing from ${params.entryPath} top-level exports:\n- ${missing.join("\n- ")}`,
   );
 }

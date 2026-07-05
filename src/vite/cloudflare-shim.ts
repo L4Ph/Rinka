@@ -1,7 +1,7 @@
 import type { Plugin } from "vite-plus";
 
 export const cloudflareShim: Plugin = {
-  name: "hibana:cloudflare-shim",
+  name: "rinka:cloudflare-shim",
   resolveId(id) {
     if (id.startsWith("cloudflare:")) return `\0${id}`;
   },

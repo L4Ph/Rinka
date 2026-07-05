@@ -1,9 +1,9 @@
 import type { DynamicRouteBinding } from "../binding-policy";
 import type {
-  HibanaCtxExports,
-  HibanaFetcher,
-  HibanaLoopbackFactory,
-  HibanaWorkerLoader,
+  RinkaCtxExports,
+  RinkaFetcher,
+  RinkaLoopbackFactory,
+  RinkaWorkerLoader,
 } from "../cloudflare-types";
 
 export type DynamicRouteEntry = {
@@ -14,8 +14,8 @@ export type DynamicRouteEntry = {
 export type DynamicRouteManifest = Record<string, DynamicRouteEntry>;
 
 export type LoaderCapableEnv = Record<string, unknown> & {
-  LOADER?: HibanaWorkerLoader;
-  ASSETS?: HibanaFetcher;
+  LOADER?: RinkaWorkerLoader;
+  ASSETS?: RinkaFetcher;
 };
 
 export { getDynamicRouteManifest, registerDynamicRouteManifest } from "./manifest";
@@ -29,7 +29,7 @@ export function clearDynamicRouteModuleCacheForTests(): void {
 export type ResolveLoaderEnvParams = {
   hostEnv: Record<string, unknown>;
   /** `ExecutionContext.exports` of the host Worker. */
-  exports: HibanaCtxExports | undefined;
+  exports: RinkaCtxExports | undefined;
   bindings: readonly DynamicRouteBinding[];
   routeId: string;
 };
@@ -39,7 +39,7 @@ export type ResolveLoaderEnvParams = {
  * object into the dynamic Worker, so only structured-clonable values and
  * Service Binding stubs may appear here — platform bindings are delivered as
  * stubs of host-exported `WorkerEntrypoint` proxy classes (see
- * `hibana/proxies`). The bare `ctx.exports.Proxy` loopback object does NOT
+ * `rinka/proxies`). The bare `ctx.exports.Proxy` loopback object does NOT
  * survive that serialization (workerd rejects `LoopbackServiceStub`), so a
  * derived stub is always created via `ctx.exports.Proxy({ props })` — with
  * the manifest's `props` when present, `{}` otherwise.
@@ -52,7 +52,7 @@ export function resolveLoaderEnv(params: ResolveLoaderEnvParams): Record<string,
       case "service": {
         if (!(binding.name in params.hostEnv)) {
           throw new Error(
-            `hibana: dynamic route "${params.routeId}" missing host env binding "${binding.name}"`,
+            `rinka: dynamic route "${params.routeId}" missing host env binding "${binding.name}"`,
           );
         }
         out[binding.name] = params.hostEnv[binding.name];
@@ -62,17 +62,17 @@ export function resolveLoaderEnv(params: ResolveLoaderEnvParams): Record<string,
         const exported = params.exports?.[binding.proxyExport];
         if (exported == null) {
           throw new Error(
-            `hibana: dynamic route "${params.routeId}" binding "${binding.name}" needs ctx.exports.${binding.proxyExport} — ` +
+            `rinka: dynamic route "${params.routeId}" binding "${binding.name}" needs ctx.exports.${binding.proxyExport} — ` +
               `export the proxy class from the Worker entry module`,
           );
         }
         if (typeof exported !== "function") {
           throw new Error(
-            `hibana: dynamic route "${params.routeId}" binding "${binding.name}" — ` +
+            `rinka: dynamic route "${params.routeId}" binding "${binding.name}" — ` +
               `ctx.exports.${binding.proxyExport} is not callable`,
           );
         }
-        out[binding.name] = (exported as HibanaLoopbackFactory)({ props: binding.props ?? {} });
+        out[binding.name] = (exported as RinkaLoopbackFactory)({ props: binding.props ?? {} });
         break;
       }
     }
@@ -81,17 +81,17 @@ export function resolveLoaderEnv(params: ResolveLoaderEnvParams): Record<string,
 }
 
 export function hasLoaderBindings(env: LoaderCapableEnv): env is LoaderCapableEnv & {
-  LOADER: HibanaWorkerLoader;
-  ASSETS: HibanaFetcher;
+  LOADER: RinkaWorkerLoader;
+  ASSETS: RinkaFetcher;
 } {
   return Boolean(env.LOADER && env.ASSETS);
 }
 
 export type DelegateDynamicRouteFetchParams = {
   request: Request;
-  env: LoaderCapableEnv & { LOADER: HibanaWorkerLoader; ASSETS: HibanaFetcher };
+  env: LoaderCapableEnv & { LOADER: RinkaWorkerLoader; ASSETS: RinkaFetcher };
   /** `ExecutionContext.exports` of the host Worker; required for proxy-mode bindings. */
-  exports?: HibanaCtxExports;
+  exports?: RinkaCtxExports;
   routeId: string;
   entry: DynamicRouteEntry;
   inlineFetch: () => Promise<Response>;
@@ -121,7 +121,7 @@ async function loadModuleCode(params: DelegateDynamicRouteFetchParams): Promise<
   try {
     assetResponse = await params.env.ASSETS.fetch(assetUrl);
   } catch (error) {
-    logError("hibana: ASSETS.fetch failed", {
+    logError("rinka: ASSETS.fetch failed", {
       routeId: params.routeId,
       assetPath: params.entry.assetPath,
       error,
@@ -133,7 +133,7 @@ async function loadModuleCode(params: DelegateDynamicRouteFetchParams): Promise<
   }
 
   if (!assetResponse.ok) {
-    logError("hibana: dynamic route asset missing", {
+    logError("rinka: dynamic route asset missing", {
       routeId: params.routeId,
       assetPath: params.entry.assetPath,
       status: assetResponse.status,
@@ -165,7 +165,7 @@ export async function delegateDynamicRouteFetch(
       routeId: params.routeId,
     });
   } catch (error) {
-    logError("hibana: failed to resolve loader env", {
+    logError("rinka: failed to resolve loader env", {
       routeId: params.routeId,
       error,
     });

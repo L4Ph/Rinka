@@ -70,7 +70,7 @@ export function assertDynamicRouteAllowed(
     switch (v.kind) {
       case "unregistered-binding":
         return (
-          `binding ${v.binding} has no hibana binding policy — Worker Loader env only accepts ` +
+          `binding ${v.binding} has no rinka binding policy — Worker Loader env only accepts ` +
           `structured-clonable values and Service Binding stubs, so classify it via the plugin's bindingPolicies option`
         );
       case "forbidden-binding":

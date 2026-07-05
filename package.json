@@ -1,9 +1,9 @@
 {
-  "name": "hibana",
+  "name": "rinka",
   "version": "0.0.1",
   "private": true,
   "description": "Opt-in per-route Dynamic Worker (Worker Loader) delegation for Hono apps on Cloudflare Workers",
-  "repository": "github:L4Ph/hibana",
+  "repository": "github:L4Ph/Rinka",
   "files": [
     "src"
   ],

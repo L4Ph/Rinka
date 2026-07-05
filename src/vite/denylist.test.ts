@@ -10,7 +10,7 @@ describe("assertDynamicRouteAllowed", () => {
     // Platform bindings like KV are NOT structured-clonable; without an
     // explicit policy the build must fail instead of 500ing at runtime.
     expect(() => assertDynamicRouteAllowed("", ["RATE_LIMIT_KV"])).toThrow(
-      /RATE_LIMIT_KV has no hibana binding policy/,
+      /RATE_LIMIT_KV has no rinka binding policy/,
     );
   });
 
@@ -29,7 +29,7 @@ describe("assertDynamicRouteAllowed", () => {
       assertDynamicRouteAllowed("", ["IMAGES"], {
         RATE_LIMIT_KV: { mode: "proxy", proxyExport: "KvNamespaceProxy" },
       }),
-    ).toThrow(/IMAGES has no hibana binding policy/);
+    ).toThrow(/IMAGES has no rinka binding policy/);
   });
 });
 
