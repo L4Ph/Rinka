@@ -56,7 +56,3 @@ export async function fetchShops(
 export async function fetchShop(id: string): Promise<{ shop: Shop }> {
   return fetchJson(`${BASE_URL}/shops/${encodeURIComponent(id)}`, `Failed to fetch shop ${id}`);
 }
-
-export async function fetchAuthor(id: string): Promise<{ author: Author }> {
-  return fetchJson(`${BASE_URL}/authors/${encodeURIComponent(id)}`, `Failed to fetch author ${id}`);
-}

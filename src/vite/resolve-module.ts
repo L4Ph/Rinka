@@ -31,8 +31,8 @@ export function resolveModuleFile(
   for (const candidate of candidates) {
     try {
       if (statSync(candidate).isFile()) return candidate;
-    } catch {
-      // not found
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
     }
   }
 
