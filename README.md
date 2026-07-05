@@ -20,7 +20,7 @@ Request
 
 - **`rinka`** — runtime: `dynamic()` wrapper, manifest registry, `resolveLoaderEnv()`. No `cloudflare:workers` import; safe to load anywhere.
 - **`rinka/proxies`** — typed `WorkerEntrypoint` proxy factories for platform bindings. workerd-only.
-- **`rinka/vite`** — the build plugin: AST scan of `dynamic()` calls, per-route bundling into assets, manifest codegen, binding-policy validation, and `PreparedRegExpRouter` init codegen.
+- **`rinka/vite`** — the build plugin: AST scan of `dynamic()` calls, per-route bundling into assets, manifest codegen, and binding-policy validation.
 
 ### The binding model
 
@@ -61,7 +61,6 @@ rinkaVitePlugin({
   root: __dirname,
   appEntry: "src/index.ts",
   scanFile: "src/routes/index.ts",
-  routerInitOut: "src/generated/router-init.ts",
   manifestOut: "src/generated/dynamic-manifest.ts",
   assetsDir: "public/dynamic-routes",
   bindingPolicies: defineBindingPolicies<Env>({

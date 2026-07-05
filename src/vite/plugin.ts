@@ -9,7 +9,6 @@ import {
 import { cloudflareShim } from "./cloudflare-shim";
 import { assertDynamicRouteAllowed } from "./denylist";
 import { formatDynamicManifestSource } from "./format-dynamic-manifest";
-import { generateRouterInit } from "./generate-router-init";
 import { defaultPathAliases, resolveModuleFile } from "./resolve-module";
 import { scanDynamicRoutesInFile, type ScannedDynamicRoute } from "./scan-dynamic-routes";
 import { assertProxyExportsExist } from "./validate-proxy-exports";
@@ -19,9 +18,7 @@ export type RinkaVitePluginOptions = {
   root: string;
   appEntry: string;
   appExport?: string;
-  generateRouterInitFlag?: string;
   scanFile: string;
-  routerInitOut: string;
   manifestOut: string;
   assetsDir: string;
   assetsBasePath?: string;
@@ -102,9 +99,7 @@ function resolveOptions(options: RinkaVitePluginOptions) {
     root,
     appEntry: options.appEntry,
     appExport: options.appExport,
-    generateRouterInitFlag: options.generateRouterInitFlag,
     scanFile: resolve(root, options.scanFile),
-    routerInitOut: resolve(root, options.routerInitOut),
     manifestOut: resolve(root, options.manifestOut),
     assetsDir: resolve(root, options.assetsDir),
     assetsBasePath: options.assetsBasePath ?? "/dynamic-routes",
@@ -117,20 +112,8 @@ function resolveOptions(options: RinkaVitePluginOptions) {
 async function runRinkaCodegen(
   ctx: { info: (msg: string) => void },
   options: RinkaVitePluginOptions,
-  cacheDevServer: boolean,
 ): Promise<void> {
   const resolved = resolveOptions(options);
-
-  const routerInit = await generateRouterInit({
-    root: resolved.root,
-    appEntry: resolved.appEntry,
-    appExport: resolved.appExport,
-    generateRouterInitFlag: resolved.generateRouterInitFlag,
-    cacheDevServer,
-  });
-  if (writeIfChanged(resolved.routerInitOut, routerInit)) {
-    ctx.info("[rinka] regenerated router init");
-  }
 
   const scanned = scanDynamicRoutesInFile(resolved.scanFile, resolved.root, resolved.pathAliases);
   const manifestRoutes = scanned.map((route) => {
@@ -171,10 +154,10 @@ export function rinkaVitePlugin(options: RinkaVitePluginOptions): Plugin {
   return {
     name: "rinka",
     buildStart() {
-      return runRinkaCodegen(this, options, false);
+      return runRinkaCodegen(this, options);
     },
     configureServer() {
-      return runRinkaCodegen(this, options, true);
+      return runRinkaCodegen(this, options);
     },
   };
 }
