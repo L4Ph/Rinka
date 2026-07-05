@@ -1,0 +1,22 @@
+{
+  "name": "example",
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "tsc --noEmit && vp build",
+    "check": "tsc --noEmit",
+    "deploy": "pnpm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "hono": "^4.12.27",
+    "rinka": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.43.0",
+    "@cloudflare/workers-types": "^4.20260426.1",
+    "typescript": "^5.9.0",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "wrangler": "^4.17.0"
+  }
+}
