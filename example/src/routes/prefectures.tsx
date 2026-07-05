@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { ErrorBoundary } from "hono/jsx";
 import type { FC } from "hono/jsx";
-import { fetchShops } from "../lib/ramen";
+import { fetchShops, type Shop } from "../lib/ramen";
 
 const PrefectureShopList: FC<{ prefecture: string }> = async ({ prefecture }) => {
-  const { shops } = await fetchShops(1, 100, prefecture);
+  const { shops }: { shops: Shop[] } = await fetchShops(1, 100, prefecture);
 
   return (
     <div>

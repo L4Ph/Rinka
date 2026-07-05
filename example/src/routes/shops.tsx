@@ -2,10 +2,10 @@ import { Hono } from "hono";
 import { ErrorBoundary } from "hono/jsx";
 import type { FC } from "hono/jsx";
 import { ShopPhoto } from "../components/shop-photo";
-import { fetchShop } from "../lib/ramen";
+import { fetchShop, type Photo, type Shop } from "../lib/ramen";
 
 const ShopDetail: FC<{ shopId: string }> = async ({ shopId }) => {
-  const { shop } = await fetchShop(shopId);
+  const { shop }: { shop: Shop } = await fetchShop(shopId);
 
   return (
     <div>
@@ -15,7 +15,7 @@ const ShopDetail: FC<{ shopId: string }> = async ({ shopId }) => {
       <h2>Photos</h2>
       {shop.photos && shop.photos.length > 0 ? (
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;">
-          {shop.photos.map((photo, index) => (
+          {shop.photos.map((photo: Photo, index) => (
             <a
               key={photo.name}
               href={`/shops/${encodeURIComponent(shopId)}/photos/${index}`}

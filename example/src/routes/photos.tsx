@@ -2,11 +2,11 @@ import { Hono } from "hono";
 import { ErrorBoundary } from "hono/jsx";
 import type { FC } from "hono/jsx";
 import { ShopPhoto } from "../components/shop-photo";
-import { fetchShop } from "../lib/ramen";
+import { fetchShop, type Author, type Photo, type Shop } from "../lib/ramen";
 
 const PhotoDetail: FC<{ shopId: string; index: number }> = async ({ shopId, index }) => {
-  const { shop } = await fetchShop(shopId);
-  const photo = shop.photos?.[index];
+  const { shop }: { shop: Shop } = await fetchShop(shopId);
+  const photo: Photo | undefined = shop.photos?.[index];
   if (!photo) throw new Error("Photo not found");
 
   return (
@@ -15,7 +15,7 @@ const PhotoDetail: FC<{ shopId: string; index: number }> = async ({ shopId, inde
         {shop.name ?? shop.id} — Photo #{index + 1}
       </h1>
       <ShopPhoto url={photo.url} alt={photo.name} width={photo.width} height={photo.height} />
-      {photo.author?.name && <p>Photo by {photo.author.name}</p>}
+      {photo.author && <p>Photo by {(photo.author as Author).name}</p>}
       <p>
         <a href={`/shops/${encodeURIComponent(shopId)}`}>Back to {shop.name ?? shop.id}</a>
       </p>
