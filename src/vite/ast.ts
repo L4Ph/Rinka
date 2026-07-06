@@ -90,6 +90,47 @@ export function readObjectStringArrayProperty(
   return undefined;
 }
 
+export function readObjectIdentifierProperty(
+  object: EstreeObjectExpression,
+  key: string,
+): string | undefined {
+  for (const prop of object.properties) {
+    if ((prop as { type?: string }).type !== "Property") continue;
+    const property = prop as { key: unknown; value: unknown; kind?: string };
+    const propKey = property.key;
+    if (
+      (isIdentifier(propKey, key) || readStringLiteral(propKey) === key) &&
+      property.kind === "init"
+    ) {
+      return isIdentifier(property.value) ? property.value.name : undefined;
+    }
+  }
+  return undefined;
+}
+
+export function readObjectBooleanProperty(
+  object: EstreeObjectExpression,
+  key: string,
+): boolean | undefined {
+  for (const prop of object.properties) {
+    if ((prop as { type?: string }).type !== "Property") continue;
+    const property = prop as { key: unknown; value: unknown; kind?: string };
+    const propKey = property.key;
+    if (
+      !(isIdentifier(propKey, key) || readStringLiteral(propKey) === key) ||
+      property.kind !== "init"
+    ) {
+      continue;
+    }
+    const value = property.value as { type?: string; value?: unknown };
+    if (value.type === "Literal" || value.type === "BooleanLiteral") {
+      return typeof value.value === "boolean" ? value.value : undefined;
+    }
+    return undefined;
+  }
+  return undefined;
+}
+
 export function isDynamicCall(
   node: EstreeCallExpression,
 ): node is EstreeCallExpression & { arguments: [EstreeIdentifier, EstreeObjectExpression] } {
@@ -117,6 +158,18 @@ export function collectNamedImports(program: Program): Map<string, string> {
     },
   });
   return imports;
+}
+
+/** All import source specifiers in a module, e.g. `["hono", "../renderer"]`. */
+export function collectImportSources(program: Program): string[] {
+  const sources: string[] = [];
+  walkModule(program, {
+    ImportDeclaration(node) {
+      const value = (node.source as { value?: unknown }).value;
+      if (typeof value === "string") sources.push(value);
+    },
+  });
+  return sources;
 }
 
 /** Top-level export names: `export class X`, `export const X`, `export { X }`, `export { X } from ...`. */

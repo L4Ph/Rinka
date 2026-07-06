@@ -1,18 +1,13 @@
 import { Hono } from "hono";
-import { dynamic } from "rinka";
-import { renderer } from "./renderer";
-import { indexRoute } from "./routes";
-import { aboutRoute } from "./routes/about";
-import { photoRoute } from "./routes/photos";
-import { prefectureRoute } from "./routes/prefectures";
-import { shopRoute } from "./routes/shops";
+import { registerDispatch } from "./generated/dispatch";
 
-const app = new Hono<{ Bindings: CloudflareBindings }>()
-  .use(renderer)
-  .route("/", dynamic(indexRoute, { id: "index", bindings: [] }))
-  .route("/shops", dynamic(shopRoute, { id: "shops", bindings: [] }))
-  .route("/shops", dynamic(photoRoute, { id: "photos", bindings: [] }))
-  .route("/prefectures", dynamic(prefectureRoute, { id: "prefectures", bindings: [] }))
-  .route("/about", aboutRoute);
+// Thin gateway: apply edge middleware here (app.use(...)), then let rinka wire
+// every route — inline routes are mounted, dynamic routes delegate to their
+// Worker isolate. The RPC type lives in ./generated/app-type, decoupled from
+// this runtime entry.
+const app = new Hono<{ Bindings: CloudflareBindings }>();
+registerDispatch(app);
 
 export default app;
+
+export type { AppType } from "./generated/app-type";

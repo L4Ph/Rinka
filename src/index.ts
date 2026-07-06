@@ -8,13 +8,18 @@ export {
   type DynamicRouteBinding,
 } from "./binding-policy";
 export { dynamic, type DynamicRouteOptions } from "./runtime/dynamic";
+export { defineRoutes, type RouteRegistration } from "./runtime/routes";
 export {
-  clearDynamicRouteModuleCacheForTests,
+  clearDynamicModulesForTests,
   delegateDynamicRouteFetch,
+  getDynamicModule,
+  getDynamicRouteId,
   getDynamicRouteManifest,
   hasLoaderBindings,
+  registerDynamicModules,
   registerDynamicRouteManifest,
   resolveLoaderEnv,
+  RINKA_ROUTE_ID_ENV_KEY,
   type DynamicRouteEntry,
   type DynamicRouteManifest,
   type LoaderCapableEnv,

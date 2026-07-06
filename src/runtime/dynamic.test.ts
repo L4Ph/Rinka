@@ -1,13 +1,10 @@
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import type {
-  RinkaFetcher,
-  RinkaWorkerLoader,
-  RinkaWorkerLoaderWorkerCode,
-} from "../cloudflare-types";
+import type { RinkaWorkerLoader, RinkaWorkerLoaderWorkerCode } from "../cloudflare-types";
 import {
-  clearDynamicRouteModuleCacheForTests,
+  clearDynamicModulesForTests,
   dynamic,
+  registerDynamicModules,
   registerDynamicRouteManifest,
 } from "../index";
 
@@ -19,7 +16,7 @@ describe("dynamic()", () => {
 
   afterEach(() => {
     registerDynamicRouteManifest({});
-    clearDynamicRouteModuleCacheForTests();
+    clearDynamicModulesForTests();
   });
 
   it("returns a route that preserves handler behavior without LOADER bindings", async () => {
@@ -32,11 +29,9 @@ describe("dynamic()", () => {
   });
 
   it("delegates to Worker Loader when bindings and manifest entry exist", async () => {
-    registerDynamicRouteManifest({
-      ping: {
-        assetPath: "/dynamic-routes/ping.js",
-        bindings: [],
-      },
+    registerDynamicRouteManifest({ ping: { bindings: [] } });
+    registerDynamicModules({
+      ping: 'export default { fetch() { return new Response("loaded"); } }',
     });
 
     const inner = new Hono().get("/ping", (c) => c.text("inline"));
@@ -50,37 +45,21 @@ describe("dynamic()", () => {
       ) => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
-    >((_id, _getCode) => ({
-      getEntrypoint: () => ({ fetch: loaderFetch }),
-    }));
-    const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
-    const assetsFetch = vi.fn<() => Promise<Response>>(
-      async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
-    );
-    const assets = { fetch: assetsFetch } as unknown as RinkaFetcher;
-
-    const env = {
-      LOADER: loader,
-      ASSETS: assets,
-    };
+    >((_id, getCode) => {
+      expect(getCode().modules["main.js"]).toContain("export default");
+      return { getEntrypoint: () => ({ fetch: loaderFetch }) };
+    });
+    const env = { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader };
 
     const res = await wrapped.fetch(new Request("http://localhost/ping"), env, executionCtx);
 
     expect(await res.text()).toBe("loaded");
     expect(loaderGet).toHaveBeenCalledOnce();
-    expect(assetsFetch).toHaveBeenCalledOnce();
-
-    await wrapped.fetch(new Request("http://localhost/ping"), env, executionCtx);
-    expect(assetsFetch).toHaveBeenCalledOnce();
   });
 
   it("strips the mount prefix before delegating to the Worker Loader entrypoint", async () => {
-    registerDynamicRouteManifest({
-      health: {
-        assetPath: "/dynamic-routes/health.js",
-        bindings: [],
-      },
-    });
+    registerDynamicRouteManifest({ health: { bindings: [] } });
+    registerDynamicModules({ health: "export default {}" });
 
     const inner = new Hono().get("/", (c) => c.text("inline"));
     const wrapped = dynamic(inner, { id: "health", bindings: [] });
@@ -91,25 +70,15 @@ describe("dynamic()", () => {
       delegated.fetch(req),
     );
     const loaderGet = vi.fn<
-      (
-        id: string | null,
-        getCode: () => RinkaWorkerLoaderWorkerCode,
-      ) => {
+      () => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
-    >((_id, _getCode) => ({
-      getEntrypoint: () => ({ fetch: loaderFetch }),
-    }));
+    >(() => ({ getEntrypoint: () => ({ fetch: loaderFetch }) }));
     const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
-    const assets = {
-      fetch: vi.fn<() => Promise<Response>>(
-        async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
-      ),
-    } as unknown as RinkaFetcher;
 
     const res = await app.fetch(
       new Request("http://localhost/v1/health"),
-      { LOADER: loader, ASSETS: assets },
+      { LOADER: loader },
       executionCtx,
     );
 
@@ -122,12 +91,8 @@ describe("dynamic()", () => {
   });
 
   it("preserves request method and body when stripping the mount prefix", async () => {
-    registerDynamicRouteManifest({
-      health: {
-        assetPath: "/dynamic-routes/health.js",
-        bindings: [],
-      },
-    });
+    registerDynamicRouteManifest({ health: { bindings: [] } });
+    registerDynamicModules({ health: "export default {}" });
 
     const inner = new Hono().post("/", (c) => c.text("inline"));
     const wrapped = dynamic(inner, { id: "health", bindings: [] });
@@ -139,21 +104,11 @@ describe("dynamic()", () => {
       delegated.fetch(req),
     );
     const loaderGet = vi.fn<
-      (
-        id: string | null,
-        getCode: () => RinkaWorkerLoaderWorkerCode,
-      ) => {
+      () => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
-    >((_id, _getCode) => ({
-      getEntrypoint: () => ({ fetch: loaderFetch }),
-    }));
+    >(() => ({ getEntrypoint: () => ({ fetch: loaderFetch }) }));
     const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
-    const assets = {
-      fetch: vi.fn<() => Promise<Response>>(
-        async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
-      ),
-    } as unknown as RinkaFetcher;
 
     const res = await app.fetch(
       new Request("http://localhost/v1/health", {
@@ -161,15 +116,13 @@ describe("dynamic()", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }),
-      { LOADER: loader, ASSETS: assets },
+      { LOADER: loader },
       executionCtx,
     );
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(body);
-    expect(loaderFetch).toHaveBeenCalledOnce();
     const delegatedRequest = loaderFetch.mock.calls[0]?.[0];
-    expect(delegatedRequest).toBeDefined();
     expect(delegatedRequest!.method).toBe("POST");
     expect(new URL(delegatedRequest!.url).pathname).toBe("/");
   });
@@ -177,10 +130,10 @@ describe("dynamic()", () => {
   it("resolves proxy bindings via executionCtx exports when delegating", async () => {
     registerDynamicRouteManifest({
       poc: {
-        assetPath: "/dynamic-routes/poc.js",
         bindings: [{ name: "RATE_LIMIT_KV", mode: "proxy", proxyExport: "RateLimitKvProxy" }],
       },
     });
+    registerDynamicModules({ poc: "export default {}" });
 
     const inner = new Hono().get("/", (c) => c.text("inline"));
     const wrapped = dynamic(inner, { id: "poc", bindings: ["RATE_LIMIT_KV"] });
@@ -196,15 +149,9 @@ describe("dynamic()", () => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
     >((_id, getCode) => {
-      expect(getCode().env).toEqual({ RATE_LIMIT_KV: stub });
+      expect(getCode().env).toEqual({ RATE_LIMIT_KV: stub, __rinkaRouteId: "poc" });
       return { getEntrypoint: () => ({ fetch: loaderFetch }) };
     });
-    const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
-    const assets = {
-      fetch: vi.fn<() => Promise<Response>>(
-        async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
-      ),
-    } as unknown as RinkaFetcher;
 
     const ctxWithExports = {
       waitUntil: () => {},
@@ -214,56 +161,10 @@ describe("dynamic()", () => {
 
     const res = await wrapped.fetch(
       new Request("http://localhost/"),
-      { LOADER: loader, ASSETS: assets, RATE_LIMIT_KV: { rawPlatformBinding: true } },
-      ctxWithExports,
-    );
-
-    expect(await res.text()).toBe("loaded");
-    expect(factory).toHaveBeenCalledWith({ props: {} });
-    expect(loaderGet).toHaveBeenCalledOnce();
-  });
-
-  it("resolves D1 proxy bindings via executionCtx exports when delegating", async () => {
-    registerDynamicRouteManifest({
-      users: {
-        assetPath: "/dynamic-routes/users.js",
-        bindings: [{ name: "USER_DB", mode: "proxy", proxyExport: "D1DbProxy" }],
+      {
+        LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader,
+        RATE_LIMIT_KV: { rawPlatformBinding: true },
       },
-    });
-
-    const inner = new Hono().get("/", (c) => c.text("inline"));
-    const wrapped = dynamic(inner, { id: "users", bindings: ["USER_DB"] });
-
-    const stub = { query: () => {}, first: () => {} };
-    const factory = vi.fn<(options: { props: Record<string, unknown> }) => typeof stub>(() => stub);
-    const loaderFetch = vi.fn<() => Promise<Response>>(async () => new Response("loaded"));
-    const loaderGet = vi.fn<
-      (
-        id: string | null,
-        getCode: () => RinkaWorkerLoaderWorkerCode,
-      ) => {
-        getEntrypoint: () => { fetch: typeof loaderFetch };
-      }
-    >((_id, getCode) => {
-      expect(getCode().env).toEqual({ USER_DB: stub });
-      return { getEntrypoint: () => ({ fetch: loaderFetch }) };
-    });
-    const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
-    const assets = {
-      fetch: vi.fn<() => Promise<Response>>(
-        async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
-      ),
-    } as unknown as RinkaFetcher;
-
-    const ctxWithExports = {
-      waitUntil: () => {},
-      passThroughOnException: () => {},
-      exports: { D1DbProxy: factory },
-    } as unknown as ExecutionContext;
-
-    const res = await wrapped.fetch(
-      new Request("http://localhost/"),
-      { LOADER: loader, ASSETS: assets, USER_DB: { rawPlatformBinding: true } },
       ctxWithExports,
     );
 
@@ -275,33 +176,20 @@ describe("dynamic()", () => {
   it("returns 502 for proxy bindings when ctx.exports is unavailable", async () => {
     registerDynamicRouteManifest({
       poc: {
-        assetPath: "/dynamic-routes/poc.js",
         bindings: [{ name: "RATE_LIMIT_KV", mode: "proxy", proxyExport: "RateLimitKvProxy" }],
       },
     });
+    registerDynamicModules({ poc: "export default {}" });
 
     const inner = new Hono().get("/", (c) => c.text("inline"));
     const wrapped = dynamic(inner, { id: "poc", bindings: ["RATE_LIMIT_KV"] });
 
-    const loaderGet = vi.fn<
-      () => {
-        getEntrypoint: () => { fetch: () => Promise<Response> };
-      }
-    >(() => ({
-      getEntrypoint: () => ({
-        fetch: vi.fn<() => Promise<Response>>(async () => new Response("loaded")),
-      }),
-    }));
+    const loaderGet = vi.fn<() => { getEntrypoint: () => { fetch: () => Promise<Response> } }>();
     const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
-    const assets = {
-      fetch: vi.fn<() => Promise<Response>>(
-        async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
-      ),
-    } as unknown as RinkaFetcher;
 
     const res = await wrapped.fetch(
       new Request("http://localhost/"),
-      { LOADER: loader, ASSETS: assets, RATE_LIMIT_KV: { rawPlatformBinding: true } },
+      { LOADER: loader, RATE_LIMIT_KV: { rawPlatformBinding: true } },
       executionCtx,
     );
 
@@ -309,38 +197,122 @@ describe("dynamic()", () => {
     expect(loaderGet).not.toHaveBeenCalled();
   });
 
-  it("returns 502 when loader asset is missing", async () => {
-    registerDynamicRouteManifest({
-      "missing-asset": {
-        assetPath: "/dynamic-routes/missing-asset.js",
-        bindings: [],
-      },
-    });
+  it("returns 502 when the dynamic module is not registered", async () => {
+    registerDynamicRouteManifest({ "missing-module": { bindings: [] } });
 
     const inner = new Hono().get("/ping", (c) => c.text("inline"));
-    const wrapped = dynamic(inner, { id: "missing-asset", bindings: [] });
+    const wrapped = dynamic(inner, { id: "missing-module", bindings: [] });
 
-    const loaderGet = vi.fn<
-      () => {
-        getEntrypoint: () => { fetch: () => Promise<Response> };
-      }
-    >(() => ({
-      getEntrypoint: () => ({
-        fetch: vi.fn<() => Promise<Response>>(async () => new Response("loaded")),
-      }),
-    }));
+    const loaderGet = vi.fn<() => { getEntrypoint: () => { fetch: () => Promise<Response> } }>();
     const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
-    const assets = {
-      fetch: vi.fn<() => Promise<Response>>(async () => new Response("missing", { status: 404 })),
-    } as unknown as RinkaFetcher;
 
     const res = await wrapped.fetch(
       new Request("http://localhost/ping"),
-      { LOADER: loader, ASSETS: assets },
+      { LOADER: loader },
       executionCtx,
     );
 
     expect(res.status).toBe(502);
+    expect(loaderGet).not.toHaveBeenCalled();
+  });
+
+  it("does not delegate a path the wrapped route can't handle; a sibling serves it", async () => {
+    registerDynamicRouteManifest({ shops: { bindings: [] } });
+    registerDynamicModules({ shops: "export default {}" });
+
+    const wrapped = dynamic(
+      new Hono().get("/:id", (c) => c.text("shop")),
+      {
+        id: "shops",
+        bindings: [],
+      },
+    );
+    const loaderGet = vi.fn<() => { getEntrypoint: () => { fetch: () => Promise<Response> } }>();
+    const app = new Hono().route("/shops", wrapped).route(
+      "/shops",
+      new Hono().get("/:id/photos/:index", (c) => c.text("sibling-photos")),
+    );
+
+    const res = await app.fetch(
+      new Request("http://localhost/shops/1/photos/2"),
+      { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader },
+      executionCtx,
+    );
+
+    expect(await res.text()).toBe("sibling-photos");
+    expect(loaderGet).not.toHaveBeenCalled();
+  });
+
+  it("routes each dynamic sibling at the same prefix to its own isolate", async () => {
+    registerDynamicRouteManifest({ shops: { bindings: [] }, photos: { bindings: [] } });
+    registerDynamicModules({ shops: "export default {}", photos: "export default {}" });
+
+    const wrappedShops = dynamic(
+      new Hono().get("/:id", (c) => c.text("i")),
+      {
+        id: "shops",
+        bindings: [],
+      },
+    );
+    const wrappedPhotos = dynamic(
+      new Hono().get("/:id/photos/:index", (c) => c.text("i")),
+      {
+        id: "photos",
+        bindings: [],
+      },
+    );
+
+    const delegatedIds: string[] = [];
+    const loaderGet = vi.fn<
+      (id: string | null) => { getEntrypoint: () => { fetch: () => Promise<Response> } }
+    >((id) => {
+      // Loader keys are `${routeId}@${contentHash}`; assert on the route id.
+      const base = (id ?? "").split("@")[0] ?? "";
+      delegatedIds.push(base);
+      return { getEntrypoint: () => ({ fetch: async () => new Response(`isolate:${base}`) }) };
+    });
+    const env = { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader };
+    const app = new Hono().route("/shops", wrappedShops).route("/shops", wrappedPhotos);
+
+    const detail = await app.fetch(new Request("http://localhost/shops/1"), env, executionCtx);
+    const photos = await app.fetch(
+      new Request("http://localhost/shops/1/photos/2"),
+      env,
+      executionCtx,
+    );
+
+    expect(await detail.text()).toBe("isolate:shops");
+    expect(await photos.text()).toBe("isolate:photos");
+    expect(delegatedIds).toEqual(["shops", "photos"]);
+  });
+
+  it("does not over-delegate when the wrapped route has global middleware", async () => {
+    registerDynamicRouteManifest({ shops: { bindings: [] } });
+    registerDynamicModules({ shops: "export default {}" });
+
+    const passthrough = async (_c: unknown, next: () => Promise<void>) => {
+      await next();
+    };
+    const wrapped = dynamic(
+      new Hono().use(passthrough).get("/:id", (c) => c.text("shop")),
+      {
+        id: "shops",
+        bindings: [],
+      },
+    );
+    const loaderGet = vi.fn<() => { getEntrypoint: () => { fetch: () => Promise<Response> } }>();
+    const app = new Hono().route("/shops", wrapped).route(
+      "/shops",
+      new Hono().get("/:id/photos/:index", (c) => c.text("sibling-photos")),
+    );
+
+    const res = await app.fetch(
+      new Request("http://localhost/shops/1/photos/2"),
+      { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader },
+      executionCtx,
+    );
+
+    expect(await res.text()).toBe("sibling-photos");
     expect(loaderGet).not.toHaveBeenCalled();
   });
 });

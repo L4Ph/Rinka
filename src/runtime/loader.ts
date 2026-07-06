@@ -1,13 +1,7 @@
 import type { DynamicRouteBinding } from "../binding-policy";
-import type {
-  RinkaCtxExports,
-  RinkaFetcher,
-  RinkaLoopbackFactory,
-  RinkaWorkerLoader,
-} from "../cloudflare-types";
+import type { RinkaCtxExports, RinkaLoopbackFactory, RinkaWorkerLoader } from "../cloudflare-types";
 
 export type DynamicRouteEntry = {
-  assetPath: string;
   bindings: readonly DynamicRouteBinding[];
 };
 
@@ -15,15 +9,54 @@ export type DynamicRouteManifest = Record<string, DynamicRouteEntry>;
 
 export type LoaderCapableEnv = Record<string, unknown> & {
   LOADER?: RinkaWorkerLoader;
-  ASSETS?: RinkaFetcher;
 };
 
 export { getDynamicRouteManifest, registerDynamicRouteManifest } from "./manifest";
 
-const dynamicRouteModuleCache = new Map<string, string>();
+// Build-embedded dynamic Worker module code, keyed by route id. rinka bakes
+// each route's bundle into the host as a string constant (see the generated
+// `dynamic-modules` file) and registers it here, so the host can hand it
+// straight to Worker Loader — no runtime asset fetch, no ASSETS dependency.
+// `version` is a cheap content hash used to bust the Worker Loader isolate
+// cache when a route's code changes (otherwise a stale isolate keyed only by
+// id sticks around — e.g. edited code not taking effect in dev).
+type DynamicModule = { code: string; version: string };
 
-export function clearDynamicRouteModuleCacheForTests(): void {
-  dynamicRouteModuleCache.clear();
+const dynamicModules = new Map<string, DynamicModule>();
+
+function hashCode(source: string): string {
+  let hash = 5381;
+  for (let i = 0; i < source.length; i++) {
+    hash = (hash * 33) ^ source.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+export function registerDynamicModules(modules: Record<string, string>): void {
+  for (const [id, code] of Object.entries(modules)) {
+    dynamicModules.set(id, { code, version: hashCode(code) });
+  }
+}
+
+export function getDynamicModule(id: string): string | undefined {
+  return dynamicModules.get(id)?.code;
+}
+
+export function clearDynamicModulesForTests(): void {
+  dynamicModules.clear();
+}
+
+/**
+ * Env key rinka injects into a dynamic Worker's isolate so the running code (and
+ * tooling) can tell it is executing dynamically, and which route it is. Inline
+ * routes run in the host and never receive it.
+ */
+export const RINKA_ROUTE_ID_ENV_KEY = "__rinkaRouteId";
+
+/** The dynamic route id when running inside a rinka Worker isolate, else undefined. */
+export function getDynamicRouteId(env: Record<string, unknown> | undefined): string | undefined {
+  const value = env?.[RINKA_ROUTE_ID_ENV_KEY];
+  return typeof value === "string" ? value : undefined;
 }
 
 export type ResolveLoaderEnvParams = {
@@ -80,16 +113,15 @@ export function resolveLoaderEnv(params: ResolveLoaderEnvParams): Record<string,
   return out;
 }
 
-export function hasLoaderBindings(env: LoaderCapableEnv): env is LoaderCapableEnv & {
-  LOADER: RinkaWorkerLoader;
-  ASSETS: RinkaFetcher;
-} {
-  return Boolean(env.LOADER && env.ASSETS);
+export function hasLoaderBindings(
+  env: LoaderCapableEnv,
+): env is LoaderCapableEnv & { LOADER: RinkaWorkerLoader } {
+  return Boolean(env.LOADER);
 }
 
 export type DelegateDynamicRouteFetchParams = {
   request: Request;
-  env: LoaderCapableEnv & { LOADER: RinkaWorkerLoader; ASSETS: RinkaFetcher };
+  env: LoaderCapableEnv & { LOADER: RinkaWorkerLoader };
   /** `ExecutionContext.exports` of the host Worker; required for proxy-mode bindings. */
   exports?: RinkaCtxExports;
   routeId: string;
@@ -103,59 +135,23 @@ function defaultLogError(message: string, fields: Record<string, unknown>): void
   console.error(message, fields);
 }
 
-function loaderAssetUnavailableResponse(): Response {
-  return new Response("Dynamic route asset unavailable", { status: 502 });
-}
-
-async function loadModuleCode(params: DelegateDynamicRouteFetchParams): Promise<string | Response> {
-  const cached = dynamicRouteModuleCache.get(params.routeId);
-  if (cached) return cached;
-
-  // Base the asset URL on the incoming request: the ASSETS binding ignores the
-  // host in production, but in dev it resolves through the Vite dev server,
-  // whose `server.allowedHosts` check 403s synthetic hosts.
-  const assetUrl = new URL(params.entry.assetPath, params.request.url);
-  const logError = params.logError ?? defaultLogError;
-
-  let assetResponse: Response;
-  try {
-    assetResponse = await params.env.ASSETS.fetch(assetUrl);
-  } catch (error) {
-    logError("rinka: ASSETS.fetch failed", {
-      routeId: params.routeId,
-      assetPath: params.entry.assetPath,
-      error,
-    });
-    if (params.allowInlineFallback) {
-      return params.inlineFetch();
-    }
-    return loaderAssetUnavailableResponse();
-  }
-
-  if (!assetResponse.ok) {
-    logError("rinka: dynamic route asset missing", {
-      routeId: params.routeId,
-      assetPath: params.entry.assetPath,
-      status: assetResponse.status,
-    });
-    if (params.allowInlineFallback) {
-      return params.inlineFetch();
-    }
-    return loaderAssetUnavailableResponse();
-  }
-
-  const moduleCode = await assetResponse.text();
-  dynamicRouteModuleCache.set(params.routeId, moduleCode);
-  return moduleCode;
+function moduleUnavailableResponse(): Response {
+  return new Response("Dynamic route module unavailable", { status: 502 });
 }
 
 export async function delegateDynamicRouteFetch(
   params: DelegateDynamicRouteFetchParams,
 ): Promise<Response> {
-  const loaded = await loadModuleCode(params);
-  if (loaded instanceof Response) return loaded;
-
   const logError = params.logError ?? defaultLogError;
+
+  const module = dynamicModules.get(params.routeId);
+  if (module === undefined) {
+    logError("rinka: dynamic route module not registered", { routeId: params.routeId });
+    if (params.allowInlineFallback) return params.inlineFetch();
+    return moduleUnavailableResponse();
+  }
+  const { code, version } = module;
+
   let loaderEnv: Record<string, unknown>;
   try {
     loaderEnv = resolveLoaderEnv({
@@ -169,16 +165,24 @@ export async function delegateDynamicRouteFetch(
       routeId: params.routeId,
       error,
     });
-    return loaderAssetUnavailableResponse();
+    return moduleUnavailableResponse();
   }
 
-  const stub = params.env.LOADER.get(params.routeId, () => ({
+  // Mark the isolate so its code (and the badge) can tell it runs dynamically,
+  // and log the delegation for Workers Logs / `wrangler tail` visibility.
+  loaderEnv[RINKA_ROUTE_ID_ENV_KEY] = params.routeId;
+  console.log(`[rinka] delegating to dynamic Worker: ${params.routeId}`);
+
+  // Key the isolate by id + content hash so changed code loads a fresh isolate.
+  const stub = params.env.LOADER.get(`${params.routeId}@${version}`, () => ({
     compatibilityDate: "2026-05-01",
     compatibilityFlags: ["nodejs_compat"],
     mainModule: "main.js",
-    modules: { "main.js": loaded },
+    modules: { "main.js": code },
     env: loaderEnv,
-    globalOutbound: null,
+    // globalOutbound omitted: inherit the host Worker's outbound so dynamic
+    // routes can make subrequests (e.g. fetch an upstream API). Set it to a
+    // Fetcher (or null) to sandbox network access instead.
   }));
 
   return stub.getEntrypoint().fetch(params.request);

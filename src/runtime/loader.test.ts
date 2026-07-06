@@ -1,14 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import type {
-  RinkaFetcher,
-  RinkaWorkerLoader,
-  RinkaWorkerLoaderWorkerCode,
-} from "../cloudflare-types";
+import type { RinkaWorkerLoader, RinkaWorkerLoaderWorkerCode } from "../cloudflare-types";
 import {
-  clearDynamicRouteModuleCacheForTests,
+  clearDynamicModulesForTests,
   delegateDynamicRouteFetch,
   type DynamicRouteEntry,
+  getDynamicRouteId,
   type LoaderCapableEnv,
+  registerDynamicModules,
   resolveLoaderEnv,
 } from "./loader";
 
@@ -122,14 +120,14 @@ describe("resolveLoaderEnv", () => {
 
 describe("delegateDynamicRouteFetch", () => {
   afterEach(() => {
-    clearDynamicRouteModuleCacheForTests();
+    clearDynamicModulesForTests();
   });
 
-  it("forwards the request to a Worker Loader entrypoint", async () => {
-    const entry: DynamicRouteEntry = {
-      assetPath: "/dynamic-routes/ping.js",
-      bindings: [],
-    };
+  it("hands the host-embedded module code to a Worker Loader entrypoint", async () => {
+    registerDynamicModules({
+      ping: 'export default { fetch() { return new Response("loaded"); } }',
+    });
+    const entry: DynamicRouteEntry = { bindings: [] };
     const loaderFetch = vi.fn<() => Promise<Response>>(async () => new Response("loaded"));
     const loaderGet = vi.fn<
       (
@@ -142,22 +140,13 @@ describe("delegateDynamicRouteFetch", () => {
       const code = getCode();
       expect(code.mainModule).toBe("main.js");
       expect(code.modules["main.js"]).toContain("export default");
-      return {
-        getEntrypoint: () => ({ fetch: loaderFetch }),
-      };
+      return { getEntrypoint: () => ({ fetch: loaderFetch }) };
     });
     const loader = { get: loaderGet } as unknown as RinkaWorkerLoader;
-    const assetsFetch = vi.fn<(input: URL) => Promise<Response>>(
-      async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
-    );
-    const assets = { fetch: assetsFetch } as unknown as RinkaFetcher;
 
     const res = await delegateDynamicRouteFetch({
       request: new Request("http://localhost/ping"),
-      env: { LOADER: loader, ASSETS: assets } as LoaderCapableEnv & {
-        LOADER: RinkaWorkerLoader;
-        ASSETS: RinkaFetcher;
-      },
+      env: { LOADER: loader } as LoaderCapableEnv & { LOADER: RinkaWorkerLoader },
       routeId: "ping",
       entry,
       inlineFetch: async () => new Response("inline"),
@@ -166,40 +155,21 @@ describe("delegateDynamicRouteFetch", () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("loaded");
     expect(loaderGet).toHaveBeenCalledOnce();
-    expect(assetsFetch).toHaveBeenCalledOnce();
-    // The asset URL must stay on the request's own origin: dev resolves the
-    // ASSETS binding through the Vite server, which 403s unknown hosts.
-    const fetchedUrl = assetsFetch.mock.calls[0]?.[0];
-    expect(fetchedUrl?.href).toBe("http://localhost/dynamic-routes/ping.js");
-
-    await delegateDynamicRouteFetch({
-      request: new Request("http://localhost/ping"),
-      env: { LOADER: loader, ASSETS: assets } as LoaderCapableEnv & {
-        LOADER: RinkaWorkerLoader;
-        ASSETS: RinkaFetcher;
-      },
-      routeId: "ping",
-      entry,
-      inlineFetch: async () => new Response("inline"),
-    });
-    expect(assetsFetch).toHaveBeenCalledOnce();
   });
 
-  it("returns 502 when the asset is missing unless inline fallback is allowed", async () => {
-    const entry: DynamicRouteEntry = {
-      assetPath: "/dynamic-routes/ping.js",
-      bindings: [],
-    };
-    const assetsFetch = vi.fn<() => Promise<Response>>(
-      async () => new Response("missing", { status: 404 }),
-    );
-    const assets = { fetch: assetsFetch } as unknown as RinkaFetcher;
+  it("returns 502 when the module is not registered unless inline fallback is allowed", async () => {
+    const entry: DynamicRouteEntry = { bindings: [] };
     const inlineFetch = vi.fn<() => Promise<Response>>(async () => new Response("inline"));
     const loaderGet = vi.fn<() => { getEntrypoint: () => { fetch: () => Promise<Response> } }>();
+    const env = {
+      LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader,
+    } as LoaderCapableEnv & {
+      LOADER: RinkaWorkerLoader;
+    };
 
     const blocked = await delegateDynamicRouteFetch({
       request: new Request("http://localhost/ping"),
-      env: { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader, ASSETS: assets },
+      env,
       routeId: "ping",
       entry,
       inlineFetch,
@@ -210,9 +180,9 @@ describe("delegateDynamicRouteFetch", () => {
     inlineFetch.mockClear();
     const fallback = await delegateDynamicRouteFetch({
       request: new Request("http://localhost/ping"),
-      env: { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader, ASSETS: assets },
-      routeId: "ping-fallback",
-      entry: { ...entry, assetPath: "/dynamic-routes/ping-fallback.js" },
+      env,
+      routeId: "ping",
+      entry,
       inlineFetch,
       allowInlineFallback: true,
     });
@@ -221,8 +191,8 @@ describe("delegateDynamicRouteFetch", () => {
   });
 
   it("passes derived proxy stubs from ctx.exports into the loader env", async () => {
+    registerDynamicModules({ poc: "export default { fetch() {} }" });
     const entry: DynamicRouteEntry = {
-      assetPath: "/dynamic-routes/poc.js",
       bindings: [{ name: "RATE_LIMIT_KV", mode: "proxy", proxyExport: "RateLimitKvProxy" }],
     };
     const stub = { get: () => {}, put: () => {} };
@@ -236,20 +206,15 @@ describe("delegateDynamicRouteFetch", () => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
     >((_id, getCode) => {
-      expect(getCode().env).toEqual({ RATE_LIMIT_KV: stub });
+      // The raw platform binding must never leak; only the stub + rinka marker.
+      expect(getCode().env).toEqual({ RATE_LIMIT_KV: stub, __rinkaRouteId: "poc" });
       return { getEntrypoint: () => ({ fetch: loaderFetch }) };
     });
-    const assets = {
-      fetch: vi.fn<() => Promise<Response>>(
-        async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
-      ),
-    } as unknown as RinkaFetcher;
 
     const res = await delegateDynamicRouteFetch({
       request: new Request("http://localhost/poc"),
       env: {
         LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader,
-        ASSETS: assets,
         RATE_LIMIT_KV: { rawPlatformBinding: true },
       },
       exports: { RateLimitKvProxy: factory },
@@ -263,22 +228,82 @@ describe("delegateDynamicRouteFetch", () => {
     expect(loaderGet).toHaveBeenCalledOnce();
   });
 
+  it("injects the route id into the isolate env so it can self-identify", async () => {
+    registerDynamicModules({ shop: "export default {}" });
+    const entry: DynamicRouteEntry = { bindings: [] };
+    let isolateEnv: Record<string, unknown> | undefined;
+    const loaderGet = vi.fn<
+      (
+        id: string | null,
+        getCode: () => RinkaWorkerLoaderWorkerCode,
+      ) => {
+        getEntrypoint: () => { fetch: () => Promise<Response> };
+      }
+    >((_id, getCode) => {
+      isolateEnv = getCode().env;
+      return { getEntrypoint: () => ({ fetch: async () => new Response("ok") }) };
+    });
+
+    await delegateDynamicRouteFetch({
+      request: new Request("http://localhost/"),
+      env: { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader } as LoaderCapableEnv & {
+        LOADER: RinkaWorkerLoader;
+      },
+      routeId: "shop",
+      entry,
+      inlineFetch: async () => new Response("inline"),
+    });
+
+    expect(getDynamicRouteId(isolateEnv)).toBe("shop");
+    // A host env (no marker) reports undefined.
+    expect(getDynamicRouteId({ LOADER: {}, ASSETS: {} })).toBeUndefined();
+  });
+
+  it("keys the isolate by content hash so changed code busts the cache", async () => {
+    const keys: string[] = [];
+    const loaderGet = vi.fn<
+      (id: string | null) => { getEntrypoint: () => { fetch: () => Promise<Response> } }
+    >((id) => {
+      keys.push(id ?? "");
+      return { getEntrypoint: () => ({ fetch: async () => new Response("ok") }) };
+    });
+    const env = {
+      LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader,
+    } as LoaderCapableEnv & {
+      LOADER: RinkaWorkerLoader;
+    };
+    const entry: DynamicRouteEntry = { bindings: [] };
+    const call = () =>
+      delegateDynamicRouteFetch({
+        request: new Request("http://localhost/"),
+        env,
+        routeId: "r",
+        entry,
+        inlineFetch: async () => new Response("inline"),
+      });
+
+    registerDynamicModules({ r: "export default { a: 1 }" });
+    await call();
+    clearDynamicModulesForTests();
+    registerDynamicModules({ r: "export default { a: 2 }" });
+    await call();
+
+    expect(keys[0]).toMatch(/^r@/);
+    expect(keys[1]).toMatch(/^r@/);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
   it("returns 502 when the loader env cannot be resolved", async () => {
+    registerDynamicModules({ ping: "export default { fetch() {} }" });
     const entry: DynamicRouteEntry = {
-      assetPath: "/dynamic-routes/ping.js",
       bindings: [{ name: "RATE_LIMIT_KV", mode: "proxy", proxyExport: "RateLimitKvProxy" }],
     };
     const logError = vi.fn<(message: string, fields: Record<string, unknown>) => void>();
     const loaderGet = vi.fn<() => { getEntrypoint: () => { fetch: () => Promise<Response> } }>();
-    const assets = {
-      fetch: vi.fn<() => Promise<Response>>(
-        async () => new Response('export default { fetch() { return new Response("loaded"); } }'),
-      ),
-    } as unknown as RinkaFetcher;
 
     const res = await delegateDynamicRouteFetch({
       request: new Request("http://localhost/ping"),
-      env: { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader, ASSETS: assets },
+      env: { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader },
       routeId: "ping",
       entry,
       inlineFetch: async () => new Response("inline"),

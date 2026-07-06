@@ -1,6 +1,7 @@
 import { Hono } from "hono";
+import { renderer } from "../renderer";
 
-const app = new Hono().get("/", (c) => {
+const app = new Hono().use(renderer).get("/", (c) => {
   return c.render(
     <div>
       <h1>About</h1>

@@ -6,7 +6,11 @@ export type RinkaWorkerLoaderWorkerCode = {
   mainModule: string;
   modules: Record<string, string>;
   env: Record<string, unknown>;
-  globalOutbound: null;
+  /**
+   * Outbound for the dynamic Worker: omit to inherit the host Worker's outbound
+   * (subrequests allowed), `null` to disable outbound, or a Fetcher to route it.
+   */
+  globalOutbound?: RinkaFetcher | null;
 };
 
 export type RinkaWorkerLoaderEntrypoint = {

@@ -3,6 +3,7 @@ import { ErrorBoundary } from "hono/jsx";
 import type { FC } from "hono/jsx";
 import { ShopPhoto } from "../components/shop-photo";
 import { fetchShop, type Author, type Photo, type Shop } from "../lib/ramen";
+import { renderer } from "../renderer";
 
 const PhotoDetail: FC<{ shopId: string; index: number }> = async ({ shopId, index }) => {
   const { shop }: { shop: Shop } = await fetchShop(shopId);
@@ -23,7 +24,7 @@ const PhotoDetail: FC<{ shopId: string; index: number }> = async ({ shopId, inde
   );
 };
 
-const app = new Hono().get("/:id/photos/:index", (c) => {
+const app = new Hono().use(renderer).get("/:id/photos/:index", (c) => {
   const id = c.req.param("id");
   const index = Number.parseInt(c.req.param("index"), 10);
   if (Number.isNaN(index) || index < 0) return c.notFound();

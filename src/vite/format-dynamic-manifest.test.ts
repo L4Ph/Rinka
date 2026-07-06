@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { formatDynamicManifestSource } from "./format-dynamic-manifest";
+import { formatDynamicManifestSource, formatDynamicModulesSource } from "./format-dynamic-manifest";
 
 describe("formatDynamicManifestSource", () => {
   it("emits structured bindings so the runtime knows how to deliver each one", () => {
@@ -29,7 +29,10 @@ describe("formatDynamicManifestSource", () => {
     // does not rewrite the generated file after every codegen run.
     expect(source).toContain("  health: {");
     expect(source).toContain('  "loader-poc": {');
-    expect(source).toContain('assetPath: "/dynamic-routes/loader-poc.js"');
+    // Module code is embedded in the host bundle (see dynamic-modules), not
+    // fetched from ASSETS — the manifest carries only binding metadata.
+    expect(source).not.toContain("assetPath");
+    expect(source).toContain('import "./dynamic-modules"');
     expect(source).toContain(
       '{ name: "RATE_LIMIT_KV", mode: "proxy", proxyExport: "KvNamespaceProxy" }',
     );
@@ -39,5 +42,27 @@ describe("formatDynamicManifestSource", () => {
       '{ name: "TENANT_KV", mode: "proxy", proxyExport: "TenantKvProxy", props: { tenant: "a" } }',
     );
     expect(source).toContain("registerDynamicRouteManifest(dynamicRouteManifest)");
+  });
+});
+
+describe("formatDynamicModulesSource", () => {
+  it("embeds each route's bundled code as a string and registers it", () => {
+    const source = formatDynamicModulesSource({
+      health: 'export default { fetch() { return new Response("ok"); } }',
+      "loader-poc": "export default {}",
+    });
+
+    expect(source).toContain("  health:");
+    expect(source).toContain('  "loader-poc":');
+    // Code is embedded as a safely-escaped string literal.
+    expect(source).toContain(
+      JSON.stringify('export default { fetch() { return new Response("ok"); } }'),
+    );
+    expect(source).toContain("registerDynamicModules(dynamicModules)");
+  });
+
+  it("emits an empty registry when there are no dynamic routes", () => {
+    const source = formatDynamicModulesSource({});
+    expect(source).toContain("export const dynamicModules: Record<string, string> = {};");
   });
 });

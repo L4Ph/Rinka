@@ -36,3 +36,6 @@ lerna-debug.log*
 
 # misc
 .DS_Store
+
+# rinka: host-embedded dynamic Worker code (regenerated on build)
+src/generated/dynamic-modules.ts

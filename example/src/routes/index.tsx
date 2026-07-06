@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { ErrorBoundary } from "hono/jsx";
 import type { FC } from "hono/jsx";
 import { fetchShops, type Shop } from "../lib/ramen";
+import { renderer } from "../renderer";
 
 const ShopList: FC = async () => {
   const { shops, totalCount }: { shops: Shop[]; totalCount: number } = await fetchShops(1, 100);
@@ -38,7 +39,7 @@ const ShopList: FC = async () => {
   );
 };
 
-const app = new Hono().get("/", (c) => {
+const app = new Hono().use(renderer).get("/", (c) => {
   return c.render(
     <ErrorBoundary fallback={<p>Something went wrong while loading ramen shops.</p>}>
       <ShopList />
