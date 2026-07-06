@@ -1,5 +1,18 @@
 import { raw } from "hono/html";
-import { jsxRenderer } from "hono/jsx-renderer";
+import { jsxRenderer, useRequestContext } from "hono/jsx-renderer";
+
+// A route runs in a Worker isolate when its env lacks the host-only LOADER
+// binding (the isolate only receives its declared bindings). Inline/host routes
+// see the full host env, so LOADER is present.
+const RuntimeBadge = () => {
+  const c = useRequestContext();
+  const dynamic = !("LOADER" in ((c.env as Record<string, unknown>) ?? {}));
+  return (
+    <div class={`rt-badge ${dynamic ? "rt-dynamic" : "rt-host"}`}>
+      {dynamic ? "⚡ Dynamic Worker" : "🏠 Host"}
+    </div>
+  );
+};
 
 export const renderer = jsxRenderer(({ children }) => {
   return (
@@ -37,16 +50,33 @@ export const renderer = jsxRenderer(({ children }) => {
             font-size: .85rem;
           }
           footer a { color: inherit; text-decoration: underline; }
+          .rt-badge {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            z-index: 10;
+            padding: .3rem .7rem;
+            border-radius: 999px;
+            font-size: .8rem;
+            font-weight: 600;
+            color: #fff;
+            box-shadow: 0 1px 4px rgba(0,0,0,.2);
+          }
+          .rt-dynamic { background: #b5382b; }
+          .rt-host { background: #555; }
           @media (prefers-color-scheme: dark) {
             body { color: #e9e9e9; background: #151515; }
             h2 { color: #b7b7b7; }
             a { color: #ff7a6e; }
             footer { border-top-color: #2a2a2a; color: #9a9a9a; }
+            .rt-dynamic { background: #ff7a6e; color: #1b1b1b; }
+            .rt-host { background: #3a3a3a; }
           }
         `)}
         </style>
       </head>
       <body>
+        <RuntimeBadge />
         <main>{children}</main>
         <footer>
           🍜 Ramen data from{" "}
