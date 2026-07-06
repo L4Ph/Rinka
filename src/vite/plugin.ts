@@ -8,6 +8,7 @@ import {
 } from "../binding-policy";
 import { cloudflareShim } from "./cloudflare-shim";
 import { assertDynamicRouteAllowed } from "./denylist";
+import { honoTinyAlias } from "./hono-tiny-alias";
 import { formatDynamicManifestSource } from "./format-dynamic-manifest";
 import { defaultPathAliases, resolveModuleFile } from "./resolve-module";
 import { scanDynamicRoutesInFile, type ScannedDynamicRoute } from "./scan-dynamic-routes";
@@ -74,7 +75,7 @@ async function bundleDynamicRoute(
     await build({
       configFile: false,
       root: options.root,
-      plugins: [cloudflareShim],
+      plugins: [cloudflareShim, honoTinyAlias],
       publicDir: false,
       build: {
         outDir: options.assetsDir,
