@@ -46,6 +46,19 @@ export function clearDynamicModulesForTests(): void {
   dynamicModules.clear();
 }
 
+/**
+ * Env key rinka injects into a dynamic Worker's isolate so the running code (and
+ * tooling) can tell it is executing dynamically, and which route it is. Inline
+ * routes run in the host and never receive it.
+ */
+export const RINKA_ROUTE_ID_ENV_KEY = "__rinkaRouteId";
+
+/** The dynamic route id when running inside a rinka Worker isolate, else undefined. */
+export function getDynamicRouteId(env: Record<string, unknown> | undefined): string | undefined {
+  const value = env?.[RINKA_ROUTE_ID_ENV_KEY];
+  return typeof value === "string" ? value : undefined;
+}
+
 export type ResolveLoaderEnvParams = {
   hostEnv: Record<string, unknown>;
   /** `ExecutionContext.exports` of the host Worker. */
@@ -154,6 +167,11 @@ export async function delegateDynamicRouteFetch(
     });
     return moduleUnavailableResponse();
   }
+
+  // Mark the isolate so its code (and the badge) can tell it runs dynamically,
+  // and log the delegation for Workers Logs / `wrangler tail` visibility.
+  loaderEnv[RINKA_ROUTE_ID_ENV_KEY] = params.routeId;
+  console.log(`[rinka] delegating to dynamic Worker: ${params.routeId}`);
 
   // Key the isolate by id + content hash so changed code loads a fresh isolate.
   const stub = params.env.LOADER.get(`${params.routeId}@${version}`, () => ({

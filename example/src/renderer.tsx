@@ -1,15 +1,16 @@
 import { raw } from "hono/html";
 import { jsxRenderer, useRequestContext } from "hono/jsx-renderer";
+import { getDynamicRouteId } from "rinka";
 
-// A route runs in a Worker isolate when its env lacks the host-only LOADER
-// binding (the isolate only receives its declared bindings). Inline/host routes
-// see the full host env, so LOADER is present.
+// rinka injects the route id into a dynamic Worker's isolate env, so this is an
+// explicit signal (not a heuristic): present -> running in that route's isolate,
+// absent -> running inline in the host.
 const RuntimeBadge = () => {
   const c = useRequestContext();
-  const dynamic = !("LOADER" in ((c.env as Record<string, unknown>) ?? {}));
+  const routeId = getDynamicRouteId(c.env as Record<string, unknown>);
   return (
-    <div class={`rt-badge ${dynamic ? "rt-dynamic" : "rt-host"}`}>
-      {dynamic ? "⚡ Dynamic Worker" : "🏠 Host"}
+    <div class={`rt-badge ${routeId ? "rt-dynamic" : "rt-host"}`}>
+      {routeId ? `⚡ Dynamic Worker: ${routeId}` : "🏠 Host"}
     </div>
   );
 };

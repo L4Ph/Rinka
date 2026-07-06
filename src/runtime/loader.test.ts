@@ -4,6 +4,7 @@ import {
   clearDynamicModulesForTests,
   delegateDynamicRouteFetch,
   type DynamicRouteEntry,
+  getDynamicRouteId,
   type LoaderCapableEnv,
   registerDynamicModules,
   resolveLoaderEnv,
@@ -205,7 +206,8 @@ describe("delegateDynamicRouteFetch", () => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
     >((_id, getCode) => {
-      expect(getCode().env).toEqual({ RATE_LIMIT_KV: stub });
+      // The raw platform binding must never leak; only the stub + rinka marker.
+      expect(getCode().env).toEqual({ RATE_LIMIT_KV: stub, __rinkaRouteId: "poc" });
       return { getEntrypoint: () => ({ fetch: loaderFetch }) };
     });
 
@@ -224,6 +226,37 @@ describe("delegateDynamicRouteFetch", () => {
     expect(await res.text()).toBe("loaded");
     expect(factory).toHaveBeenCalledWith({ props: {} });
     expect(loaderGet).toHaveBeenCalledOnce();
+  });
+
+  it("injects the route id into the isolate env so it can self-identify", async () => {
+    registerDynamicModules({ shop: "export default {}" });
+    const entry: DynamicRouteEntry = { bindings: [] };
+    let isolateEnv: Record<string, unknown> | undefined;
+    const loaderGet = vi.fn<
+      (
+        id: string | null,
+        getCode: () => RinkaWorkerLoaderWorkerCode,
+      ) => {
+        getEntrypoint: () => { fetch: () => Promise<Response> };
+      }
+    >((_id, getCode) => {
+      isolateEnv = getCode().env;
+      return { getEntrypoint: () => ({ fetch: async () => new Response("ok") }) };
+    });
+
+    await delegateDynamicRouteFetch({
+      request: new Request("http://localhost/"),
+      env: { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader } as LoaderCapableEnv & {
+        LOADER: RinkaWorkerLoader;
+      },
+      routeId: "shop",
+      entry,
+      inlineFetch: async () => new Response("inline"),
+    });
+
+    expect(getDynamicRouteId(isolateEnv)).toBe("shop");
+    // A host env (no marker) reports undefined.
+    expect(getDynamicRouteId({ LOADER: {}, ASSETS: {} })).toBeUndefined();
   });
 
   it("keys the isolate by content hash so changed code busts the cache", async () => {

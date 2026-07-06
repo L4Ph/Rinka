@@ -149,7 +149,7 @@ describe("dynamic()", () => {
         getEntrypoint: () => { fetch: typeof loaderFetch };
       }
     >((_id, getCode) => {
-      expect(getCode().env).toEqual({ RATE_LIMIT_KV: stub });
+      expect(getCode().env).toEqual({ RATE_LIMIT_KV: stub, __rinkaRouteId: "poc" });
       return { getEntrypoint: () => ({ fetch: loaderFetch }) };
     });
 
