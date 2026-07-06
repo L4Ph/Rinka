@@ -9,10 +9,12 @@ export {
 } from "./binding-policy";
 export { dynamic, type DynamicRouteOptions } from "./runtime/dynamic";
 export {
-  clearDynamicRouteModuleCacheForTests,
+  clearDynamicModulesForTests,
   delegateDynamicRouteFetch,
+  getDynamicModule,
   getDynamicRouteManifest,
   hasLoaderBindings,
+  registerDynamicModules,
   registerDynamicRouteManifest,
   resolveLoaderEnv,
   type DynamicRouteEntry,

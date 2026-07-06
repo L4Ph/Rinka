@@ -8,8 +8,8 @@ import {
 } from "../binding-policy";
 import { cloudflareShim } from "./cloudflare-shim";
 import { assertDynamicRouteAllowed } from "./denylist";
+import { formatDynamicManifestSource, formatDynamicModulesSource } from "./format-dynamic-manifest";
 import { honoTinyAlias } from "./hono-tiny-alias";
-import { formatDynamicManifestSource } from "./format-dynamic-manifest";
 import { defaultPathAliases, resolveModuleFile } from "./resolve-module";
 import { scanDynamicRoutesInFile, type ScannedDynamicRoute } from "./scan-dynamic-routes";
 import { assertProxyExportsExist } from "./validate-proxy-exports";
@@ -63,10 +63,11 @@ function relativeImport(fromDir: string, modulePath: string): string {
   return rel.startsWith(".") ? rel : `./${rel}`;
 }
 
+/** Bundles one dynamic route into an isolate Worker module and returns its code. */
 async function bundleDynamicRoute(
   route: ScannedDynamicRoute,
   options: Required<Pick<RinkaVitePluginOptions, "root" | "assetsDir" | "entryDir">>,
-): Promise<void> {
+): Promise<string> {
   const entryFile = resolve(options.entryDir, `${route.id}.ts`);
   const moduleImportPath = relativeImport(dirname(entryFile), route.modulePath);
   writeFileSync(entryFile, buildRouteBundleSource(route.exportName, moduleImportPath));
@@ -77,6 +78,7 @@ async function bundleDynamicRoute(
       root: options.root,
       plugins: [cloudflareShim, honoTinyAlias],
       publicDir: false,
+      logLevel: "silent",
       build: {
         outDir: options.assetsDir,
         emptyOutDir: false,
@@ -93,6 +95,8 @@ async function bundleDynamicRoute(
   } catch (err) {
     throw new Error(`Failed to bundle dynamic route ${route.id} (${entryFile})`, { cause: err });
   }
+
+  return readFileSync(resolve(options.assetsDir, `${route.id}.js`), "utf8");
 }
 
 function resolveOptions(options: RinkaVitePluginOptions) {
@@ -136,19 +140,27 @@ async function runRinkaCodegen(
     routes: manifestRoutes,
   });
 
-  const manifestSource = formatDynamicManifestSource(manifestRoutes, resolved.assetsBasePath);
-  if (writeIfChanged(resolved.manifestOut, manifestSource)) {
-    ctx.info("[rinka] regenerated dynamic route manifest");
-  }
-
   mkdirSync(resolved.assetsDir, { recursive: true });
   mkdirSync(resolved.entryDir, { recursive: true });
+
+  // Bundle each route and embed its code as a host string constant, so the host
+  // hands it straight to Worker Loader (no runtime asset fetch).
+  const modules: Record<string, string> = {};
   for (const route of manifestRoutes) {
-    await bundleDynamicRoute(route, {
+    modules[route.id] = await bundleDynamicRoute(route, {
       root: resolved.root,
       assetsDir: resolved.assetsDir,
       entryDir: resolved.entryDir,
     });
+  }
+
+  // The manifest imports the modules file, so write the modules first.
+  const modulesOut = resolve(dirname(resolved.manifestOut), "dynamic-modules.ts");
+  if (writeIfChanged(modulesOut, formatDynamicModulesSource(modules))) {
+    ctx.info("[rinka] regenerated embedded dynamic route modules");
+  }
+  if (writeIfChanged(resolved.manifestOut, formatDynamicManifestSource(manifestRoutes))) {
+    ctx.info("[rinka] regenerated dynamic route manifest");
   }
 }
 

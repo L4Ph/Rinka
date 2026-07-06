@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { dynamic } from "rinka";
+// Registers the dynamic route manifest and the host-embedded Worker modules.
+import "./generated/dynamic-manifest";
 import { renderer } from "./renderer";
 import { indexRoute } from "./routes";
 import { aboutRoute } from "./routes/about";

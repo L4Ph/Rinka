@@ -2,7 +2,6 @@ import { Hono, type Context, type Hono as HonoType, type Next } from "hono";
 import type {
   RinkaCtxExports,
   RinkaExecutionContext,
-  RinkaFetcher,
   RinkaWorkerLoader,
 } from "../cloudflare-types";
 import {
@@ -63,7 +62,7 @@ export function dynamic<T extends HonoType<any, any, any>>(
       const request = rewriteRequestForMount(c.req.raw, mountPrefix);
       return delegateDynamicRouteFetch({
         request,
-        env: env as LoaderCapableEnv & { LOADER: RinkaWorkerLoader; ASSETS: RinkaFetcher },
+        env: env as LoaderCapableEnv & { LOADER: RinkaWorkerLoader },
         exports: getCtxExports(c),
         routeId: options.id,
         entry,
