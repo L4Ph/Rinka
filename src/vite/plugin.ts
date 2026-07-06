@@ -8,10 +8,12 @@ import {
 } from "../binding-policy";
 import { cloudflareShim } from "./cloudflare-shim";
 import { assertDynamicRouteAllowed } from "./denylist";
+import { formatAppTypeSource } from "./format-app-type";
+import { formatDispatchSource } from "./format-dispatch";
 import { formatDynamicManifestSource, formatDynamicModulesSource } from "./format-dynamic-manifest";
 import { honoTinyAlias } from "./hono-tiny-alias";
 import { defaultPathAliases, resolveModuleFile } from "./resolve-module";
-import { scanDynamicRoutesInFile, type ScannedDynamicRoute } from "./scan-dynamic-routes";
+import { scanRouteRegistrationsInFile, type ScannedRoute } from "./scan-route-registrations";
 import { assertProxyExportsExist } from "./validate-proxy-exports";
 import { assertDeclaredBindingsCoverEnvAccess } from "./validate-route-bindings";
 
@@ -65,7 +67,7 @@ function relativeImport(fromDir: string, modulePath: string): string {
 
 /** Bundles one dynamic route into an isolate Worker module and returns its code. */
 async function bundleDynamicRoute(
-  route: ScannedDynamicRoute,
+  route: Pick<ScannedRoute, "id" | "exportName" | "modulePath">,
   options: Required<Pick<RinkaVitePluginOptions, "root" | "assetsDir" | "entryDir">>,
 ): Promise<string> {
   const entryFile = resolve(options.entryDir, `${route.id}.ts`);
@@ -120,9 +122,16 @@ async function runRinkaCodegen(
   options: RinkaVitePluginOptions,
 ): Promise<void> {
   const resolved = resolveOptions(options);
+  const generatedDir = dirname(resolved.manifestOut);
 
-  const scanned = scanDynamicRoutesInFile(resolved.scanFile, resolved.root, resolved.pathAliases);
-  const manifestRoutes = scanned.map((route) => {
+  const routes = scanRouteRegistrationsInFile(
+    resolved.scanFile,
+    resolved.root,
+    resolved.pathAliases,
+  );
+  const dynamicRoutes = routes.filter((route) => route.dynamic);
+
+  const manifestRoutes = dynamicRoutes.map((route) => {
     const source = readFileSync(route.modulePath, "utf8");
     assertDeclaredBindingsCoverEnvAccess(source, route.bindings, route.modulePath);
     assertDynamicRouteAllowed(source, route.bindings, resolved.bindingPolicies, route.modulePath);
@@ -143,8 +152,8 @@ async function runRinkaCodegen(
   mkdirSync(resolved.assetsDir, { recursive: true });
   mkdirSync(resolved.entryDir, { recursive: true });
 
-  // Bundle each route and embed its code as a host string constant, so the host
-  // hands it straight to Worker Loader (no runtime asset fetch).
+  // Bundle each dynamic route and embed its code as a host string constant, so
+  // the host hands it straight to Worker Loader (no runtime asset fetch).
   const modules: Record<string, string> = {};
   for (const route of manifestRoutes) {
     modules[route.id] = await bundleDynamicRoute(route, {
@@ -154,13 +163,40 @@ async function runRinkaCodegen(
     });
   }
 
+  const importPathFor = (route: ScannedRoute) => relativeImport(generatedDir, route.modulePath);
+
   // The manifest imports the modules file, so write the modules first.
-  const modulesOut = resolve(dirname(resolved.manifestOut), "dynamic-modules.ts");
+  const modulesOut = resolve(generatedDir, "dynamic-modules.ts");
   if (writeIfChanged(modulesOut, formatDynamicModulesSource(modules))) {
     ctx.info("[rinka] regenerated embedded dynamic route modules");
   }
   if (writeIfChanged(resolved.manifestOut, formatDynamicManifestSource(manifestRoutes))) {
     ctx.info("[rinka] regenerated dynamic route manifest");
+  }
+
+  const appTypeSource = formatAppTypeSource(
+    routes.map((route) => ({
+      mount: route.mount,
+      exportName: route.exportName,
+      importPath: importPathFor(route),
+    })),
+  );
+  if (writeIfChanged(resolve(generatedDir, "app-type.ts"), appTypeSource)) {
+    ctx.info("[rinka] regenerated AppType");
+  }
+
+  const dispatchSource = formatDispatchSource(
+    routes.map((route) => ({
+      mount: route.mount,
+      exportName: route.exportName,
+      importPath: importPathFor(route),
+      id: route.id,
+      dynamic: route.dynamic,
+      bindings: route.bindings,
+    })),
+  );
+  if (writeIfChanged(resolve(generatedDir, "dispatch.ts"), dispatchSource)) {
+    ctx.info("[rinka] regenerated dispatch");
   }
 }
 

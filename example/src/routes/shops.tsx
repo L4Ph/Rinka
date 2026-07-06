@@ -3,6 +3,7 @@ import { ErrorBoundary } from "hono/jsx";
 import type { FC } from "hono/jsx";
 import { ShopPhoto } from "../components/shop-photo";
 import { fetchShop, type Photo, type Shop } from "../lib/ramen";
+import { renderer } from "../renderer";
 
 const ShopDetail: FC<{ shopId: string }> = async ({ shopId }) => {
   const { shop }: { shop: Shop } = await fetchShop(shopId);
@@ -41,7 +42,7 @@ const ShopDetail: FC<{ shopId: string }> = async ({ shopId }) => {
   );
 };
 
-const app = new Hono().get("/:id", (c) => {
+const app = new Hono().use(renderer).get("/:id", (c) => {
   const id = c.req.param("id");
   return c.render(
     <ErrorBoundary fallback={<p>Something went wrong while loading the shop.</p>}>

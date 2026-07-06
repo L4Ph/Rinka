@@ -9,9 +9,6 @@ export const dynamicRouteManifest: DynamicRouteManifest = {
   index: {
     bindings: [],
   },
-  shops: {
-    bindings: [],
-  },
   photos: {
     bindings: [],
   },

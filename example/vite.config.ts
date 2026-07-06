@@ -10,7 +10,7 @@ export default defineConfig({
     rinkaVitePlugin({
       root: __dirname,
       appEntry: "src/index.tsx",
-      scanFile: "src/index.tsx",
+      scanFile: "src/routes.ts",
       manifestOut: "src/generated/dynamic-manifest.ts",
       assetsDir: "public/dynamic-routes",
       bindingPolicies: defineBindingPolicies<Env>({}),
