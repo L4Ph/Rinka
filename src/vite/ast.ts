@@ -160,6 +160,18 @@ export function collectNamedImports(program: Program): Map<string, string> {
   return imports;
 }
 
+/** All import source specifiers in a module, e.g. `["hono", "../renderer"]`. */
+export function collectImportSources(program: Program): string[] {
+  const sources: string[] = [];
+  walkModule(program, {
+    ImportDeclaration(node) {
+      const value = (node.source as { value?: unknown }).value;
+      if (typeof value === "string") sources.push(value);
+    },
+  });
+  return sources;
+}
+
 /** Top-level export names: `export class X`, `export const X`, `export { X }`, `export { X } from ...`. */
 export function collectExportedNames(program: Program): Set<string> {
   const names = new Set<string>();

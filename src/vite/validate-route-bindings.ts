@@ -1,4 +1,14 @@
-import { isIdentifier, parseModuleSource, readStringLiteral, walkModule } from "./ast";
+import { readFileSync } from "node:fs";
+import { dirname } from "node:path";
+import type { Program } from "oxc-parser";
+import {
+  collectImportSources,
+  isIdentifier,
+  parseModuleSource,
+  readStringLiteral,
+  walkModule,
+} from "./ast";
+import { resolveModuleFile } from "./resolve-module";
 
 type EnvUsageAnalysis = {
   accessed: Set<string>;
@@ -122,8 +132,7 @@ function analyzeFunctionBody(body: unknown, ctxName: string): EnvUsageAnalysis {
   return analysis;
 }
 
-function analyzeProgram(source: string, filename = "module.ts"): EnvUsageAnalysis {
-  const program = parseModuleSource(source, filename);
+function analyzeProgramNode(program: Program): EnvUsageAnalysis {
   const combined: EnvUsageAnalysis = {
     accessed: new Set<string>(),
     unanalyzableEnvPass: false,
@@ -153,12 +162,70 @@ function analyzeProgram(source: string, filename = "module.ts"): EnvUsageAnalysi
   return combined;
 }
 
-export function assertDeclaredBindingsCoverEnvAccess(
-  source: string,
-  bindings: readonly string[],
-  filename = "module.ts",
-): void {
-  const { accessed, unanalyzableEnvPass } = analyzeProgram(source, filename);
+function analyzeProgram(source: string, filename = "module.ts"): EnvUsageAnalysis {
+  return analyzeProgramNode(parseModuleSource(source, filename));
+}
+
+function isLocalSpecifier(spec: string, pathAliases: Record<string, string>): boolean {
+  if (spec.startsWith(".")) return true;
+  for (const alias of Object.keys(pathAliases)) {
+    const prefix = alias.endsWith("*") ? alias.slice(0, -1) : alias;
+    if (prefix.length > 0 && spec.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+/**
+ * Env access of a route module *and* the local modules it imports (middleware,
+ * helpers). A route delivered to an isolate carries its imported middleware, so
+ * a binding that only a `.use()`'d middleware touches still has to be declared.
+ * Only relative / path-aliased imports are followed — third-party packages are
+ * left alone. Cycles are guarded by a visited set.
+ */
+export function collectEnvAccessDeep(
+  entryPath: string,
+  pathAliases: Record<string, string> = {},
+): EnvUsageAnalysis {
+  const combined: EnvUsageAnalysis = {
+    accessed: new Set<string>(),
+    unanalyzableEnvPass: false,
+  };
+  const visited = new Set<string>();
+
+  const visit = (filePath: string): void => {
+    if (visited.has(filePath)) return;
+    visited.add(filePath);
+
+    let source: string;
+    try {
+      source = readFileSync(filePath, "utf8");
+    } catch {
+      return;
+    }
+
+    const program = parseModuleSource(source, filePath);
+    const local = analyzeProgramNode(program);
+    for (const name of local.accessed) combined.accessed.add(name);
+    combined.unanalyzableEnvPass ||= local.unanalyzableEnvPass;
+
+    for (const spec of collectImportSources(program)) {
+      if (!isLocalSpecifier(spec, pathAliases)) continue;
+      let resolved: string;
+      try {
+        resolved = resolveModuleFile(spec, dirname(filePath), pathAliases);
+      } catch {
+        continue;
+      }
+      visit(resolved);
+    }
+  };
+
+  visit(entryPath);
+  return combined;
+}
+
+function assertCoverage(analysis: EnvUsageAnalysis, bindings: readonly string[]): void {
+  const { accessed, unanalyzableEnvPass } = analysis;
 
   if (unanalyzableEnvPass && bindings.length === 0) {
     throw new Error(
@@ -181,4 +248,26 @@ export function assertDeclaredBindingsCoverEnvAccess(
       `Dynamic route uses env bindings not declared in dynamic(..., { bindings }): ${missing.join(", ")}`,
     );
   }
+}
+
+/** Asserts declared bindings cover the env access of a single module source. */
+export function assertDeclaredBindingsCoverEnvAccess(
+  source: string,
+  bindings: readonly string[],
+  filename = "module.ts",
+): void {
+  assertCoverage(analyzeProgram(source, filename), bindings);
+}
+
+/**
+ * Asserts declared bindings cover the env access of a route module and its
+ * local imports (middleware and helpers it pulls in), which travel into the
+ * isolate with the route.
+ */
+export function assertDeclaredBindingsCoverEnvAccessDeep(
+  entryPath: string,
+  bindings: readonly string[],
+  pathAliases: Record<string, string> = {},
+): void {
+  assertCoverage(collectEnvAccessDeep(entryPath, pathAliases), bindings);
 }

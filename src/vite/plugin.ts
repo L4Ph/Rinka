@@ -15,7 +15,7 @@ import { honoTinyAlias } from "./hono-tiny-alias";
 import { defaultPathAliases, resolveModuleFile } from "./resolve-module";
 import { scanRouteRegistrationsInFile, type ScannedRoute } from "./scan-route-registrations";
 import { assertProxyExportsExist } from "./validate-proxy-exports";
-import { assertDeclaredBindingsCoverEnvAccess } from "./validate-route-bindings";
+import { assertDeclaredBindingsCoverEnvAccessDeep } from "./validate-route-bindings";
 
 export type RinkaVitePluginOptions = {
   root: string;
@@ -133,7 +133,11 @@ async function runRinkaCodegen(
 
   const manifestRoutes = dynamicRoutes.map((route) => {
     const source = readFileSync(route.modulePath, "utf8");
-    assertDeclaredBindingsCoverEnvAccess(source, route.bindings, route.modulePath);
+    assertDeclaredBindingsCoverEnvAccessDeep(
+      route.modulePath,
+      route.bindings,
+      resolved.pathAliases,
+    );
     assertDynamicRouteAllowed(source, route.bindings, resolved.bindingPolicies, route.modulePath);
     // assertDynamicRouteAllowed already rejected unregistered/forbidden bindings.
     const { resolved: resolvedBindings } = resolveBindingPolicies(
