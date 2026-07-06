@@ -147,7 +147,9 @@ export async function delegateDynamicRouteFetch(
     mainModule: "main.js",
     modules: { "main.js": code },
     env: loaderEnv,
-    globalOutbound: null,
+    // globalOutbound omitted: inherit the host Worker's outbound so dynamic
+    // routes can make subrequests (e.g. fetch an upstream API). Set it to a
+    // Fetcher (or null) to sandbox network access instead.
   }));
 
   return stub.getEntrypoint().fetch(params.request);
