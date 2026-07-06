@@ -17,16 +17,29 @@ export { getDynamicRouteManifest, registerDynamicRouteManifest } from "./manifes
 // each route's bundle into the host as a string constant (see the generated
 // `dynamic-modules` file) and registers it here, so the host can hand it
 // straight to Worker Loader — no runtime asset fetch, no ASSETS dependency.
-const dynamicModules = new Map<string, string>();
+// `version` is a cheap content hash used to bust the Worker Loader isolate
+// cache when a route's code changes (otherwise a stale isolate keyed only by
+// id sticks around — e.g. edited code not taking effect in dev).
+type DynamicModule = { code: string; version: string };
+
+const dynamicModules = new Map<string, DynamicModule>();
+
+function hashCode(source: string): string {
+  let hash = 5381;
+  for (let i = 0; i < source.length; i++) {
+    hash = (hash * 33) ^ source.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(36);
+}
 
 export function registerDynamicModules(modules: Record<string, string>): void {
   for (const [id, code] of Object.entries(modules)) {
-    dynamicModules.set(id, code);
+    dynamicModules.set(id, { code, version: hashCode(code) });
   }
 }
 
 export function getDynamicModule(id: string): string | undefined {
-  return dynamicModules.get(id);
+  return dynamicModules.get(id)?.code;
 }
 
 export function clearDynamicModulesForTests(): void {
@@ -118,12 +131,13 @@ export async function delegateDynamicRouteFetch(
 ): Promise<Response> {
   const logError = params.logError ?? defaultLogError;
 
-  const code = getDynamicModule(params.routeId);
-  if (code === undefined) {
+  const module = dynamicModules.get(params.routeId);
+  if (module === undefined) {
     logError("rinka: dynamic route module not registered", { routeId: params.routeId });
     if (params.allowInlineFallback) return params.inlineFetch();
     return moduleUnavailableResponse();
   }
+  const { code, version } = module;
 
   let loaderEnv: Record<string, unknown>;
   try {
@@ -141,7 +155,8 @@ export async function delegateDynamicRouteFetch(
     return moduleUnavailableResponse();
   }
 
-  const stub = params.env.LOADER.get(params.routeId, () => ({
+  // Key the isolate by id + content hash so changed code loads a fresh isolate.
+  const stub = params.env.LOADER.get(`${params.routeId}@${version}`, () => ({
     compatibilityDate: "2026-05-01",
     compatibilityFlags: ["nodejs_compat"],
     mainModule: "main.js",

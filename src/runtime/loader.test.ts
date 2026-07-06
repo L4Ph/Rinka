@@ -226,6 +226,40 @@ describe("delegateDynamicRouteFetch", () => {
     expect(loaderGet).toHaveBeenCalledOnce();
   });
 
+  it("keys the isolate by content hash so changed code busts the cache", async () => {
+    const keys: string[] = [];
+    const loaderGet = vi.fn<
+      (id: string | null) => { getEntrypoint: () => { fetch: () => Promise<Response> } }
+    >((id) => {
+      keys.push(id ?? "");
+      return { getEntrypoint: () => ({ fetch: async () => new Response("ok") }) };
+    });
+    const env = {
+      LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader,
+    } as LoaderCapableEnv & {
+      LOADER: RinkaWorkerLoader;
+    };
+    const entry: DynamicRouteEntry = { bindings: [] };
+    const call = () =>
+      delegateDynamicRouteFetch({
+        request: new Request("http://localhost/"),
+        env,
+        routeId: "r",
+        entry,
+        inlineFetch: async () => new Response("inline"),
+      });
+
+    registerDynamicModules({ r: "export default { a: 1 }" });
+    await call();
+    clearDynamicModulesForTests();
+    registerDynamicModules({ r: "export default { a: 2 }" });
+    await call();
+
+    expect(keys[0]).toMatch(/^r@/);
+    expect(keys[1]).toMatch(/^r@/);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
   it("returns 502 when the loader env cannot be resolved", async () => {
     registerDynamicModules({ ping: "export default { fetch() {} }" });
     const entry: DynamicRouteEntry = {

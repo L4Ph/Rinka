@@ -266,8 +266,10 @@ describe("dynamic()", () => {
     const loaderGet = vi.fn<
       (id: string | null) => { getEntrypoint: () => { fetch: () => Promise<Response> } }
     >((id) => {
-      delegatedIds.push(id ?? "");
-      return { getEntrypoint: () => ({ fetch: async () => new Response(`isolate:${id}`) }) };
+      // Loader keys are `${routeId}@${contentHash}`; assert on the route id.
+      const base = (id ?? "").split("@")[0] ?? "";
+      delegatedIds.push(base);
+      return { getEntrypoint: () => ({ fetch: async () => new Response(`isolate:${base}`) }) };
     });
     const env = { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader };
     const app = new Hono().route("/shops", wrappedShops).route("/shops", wrappedPhotos);
