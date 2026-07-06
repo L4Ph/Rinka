@@ -8,6 +8,7 @@ export {
   type DynamicRouteBinding,
 } from "./binding-policy";
 export { dynamic, type DynamicRouteOptions } from "./runtime/dynamic";
+export { defineRoutes, type RouteRegistration } from "./runtime/routes";
 export {
   clearDynamicModulesForTests,
   delegateDynamicRouteFetch,

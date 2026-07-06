@@ -48,6 +48,31 @@ function getCtxExports(c: Context): RinkaCtxExports | undefined {
   }
 }
 
+/**
+ * Whether the wrapped route has a real handler for `method` + `path`. The
+ * wrapper mounts delegation on `"*"`, which matches every request under the
+ * mount prefix — including paths the route itself does not serve. Delegating
+ * those would swallow sibling routes mounted at the same prefix (host routes or
+ * other dynamic routes) and misroute them into this route's isolate, so we only
+ * delegate when the route actually matches and otherwise fall through.
+ *
+ * A route may apply its own middleware (e.g. a renderer via `use("*")`). Such
+ * middleware matches every path but does not itself handle the request, so it
+ * is ignored — otherwise a route with any global middleware would look like it
+ * handles every path and start swallowing siblings again.
+ */
+function routeHandlesRequest(
+  route: HonoType<any, any, any>,
+  method: string,
+  path: string,
+): boolean {
+  const [matched] = route.router.match(method, path);
+  return matched.some((entry) => {
+    const routerRoute = entry[0][1] as { method: string; path: string };
+    return !(routerRoute.method === "ALL" && routerRoute.path.endsWith("*"));
+  });
+}
+
 export function dynamic<T extends HonoType<any, any, any>>(
   route: T,
   options: DynamicRouteOptions<HonoBindingsOf<T>>,
@@ -60,6 +85,9 @@ export function dynamic<T extends HonoType<any, any, any>>(
     if (entry && hasLoaderBindings(env)) {
       const mountPrefix = c.req.routePath.replace(/\/\*$/, "");
       const request = rewriteRequestForMount(c.req.raw, mountPrefix);
+      if (!routeHandlesRequest(route, c.req.method, new URL(request.url).pathname)) {
+        return next();
+      }
       return delegateDynamicRouteFetch({
         request,
         env: env as LoaderCapableEnv & { LOADER: RinkaWorkerLoader },

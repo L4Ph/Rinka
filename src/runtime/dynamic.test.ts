@@ -215,4 +215,102 @@ describe("dynamic()", () => {
     expect(res.status).toBe(502);
     expect(loaderGet).not.toHaveBeenCalled();
   });
+
+  it("does not delegate a path the wrapped route can't handle; a sibling serves it", async () => {
+    registerDynamicRouteManifest({ shops: { bindings: [] } });
+    registerDynamicModules({ shops: "export default {}" });
+
+    const wrapped = dynamic(
+      new Hono().get("/:id", (c) => c.text("shop")),
+      {
+        id: "shops",
+        bindings: [],
+      },
+    );
+    const loaderGet = vi.fn<() => { getEntrypoint: () => { fetch: () => Promise<Response> } }>();
+    const app = new Hono().route("/shops", wrapped).route(
+      "/shops",
+      new Hono().get("/:id/photos/:index", (c) => c.text("sibling-photos")),
+    );
+
+    const res = await app.fetch(
+      new Request("http://localhost/shops/1/photos/2"),
+      { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader },
+      executionCtx,
+    );
+
+    expect(await res.text()).toBe("sibling-photos");
+    expect(loaderGet).not.toHaveBeenCalled();
+  });
+
+  it("routes each dynamic sibling at the same prefix to its own isolate", async () => {
+    registerDynamicRouteManifest({ shops: { bindings: [] }, photos: { bindings: [] } });
+    registerDynamicModules({ shops: "export default {}", photos: "export default {}" });
+
+    const wrappedShops = dynamic(
+      new Hono().get("/:id", (c) => c.text("i")),
+      {
+        id: "shops",
+        bindings: [],
+      },
+    );
+    const wrappedPhotos = dynamic(
+      new Hono().get("/:id/photos/:index", (c) => c.text("i")),
+      {
+        id: "photos",
+        bindings: [],
+      },
+    );
+
+    const delegatedIds: string[] = [];
+    const loaderGet = vi.fn<
+      (id: string | null) => { getEntrypoint: () => { fetch: () => Promise<Response> } }
+    >((id) => {
+      delegatedIds.push(id ?? "");
+      return { getEntrypoint: () => ({ fetch: async () => new Response(`isolate:${id}`) }) };
+    });
+    const env = { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader };
+    const app = new Hono().route("/shops", wrappedShops).route("/shops", wrappedPhotos);
+
+    const detail = await app.fetch(new Request("http://localhost/shops/1"), env, executionCtx);
+    const photos = await app.fetch(
+      new Request("http://localhost/shops/1/photos/2"),
+      env,
+      executionCtx,
+    );
+
+    expect(await detail.text()).toBe("isolate:shops");
+    expect(await photos.text()).toBe("isolate:photos");
+    expect(delegatedIds).toEqual(["shops", "photos"]);
+  });
+
+  it("does not over-delegate when the wrapped route has global middleware", async () => {
+    registerDynamicRouteManifest({ shops: { bindings: [] } });
+    registerDynamicModules({ shops: "export default {}" });
+
+    const passthrough = async (_c: unknown, next: () => Promise<void>) => {
+      await next();
+    };
+    const wrapped = dynamic(
+      new Hono().use(passthrough).get("/:id", (c) => c.text("shop")),
+      {
+        id: "shops",
+        bindings: [],
+      },
+    );
+    const loaderGet = vi.fn<() => { getEntrypoint: () => { fetch: () => Promise<Response> } }>();
+    const app = new Hono().route("/shops", wrapped).route(
+      "/shops",
+      new Hono().get("/:id/photos/:index", (c) => c.text("sibling-photos")),
+    );
+
+    const res = await app.fetch(
+      new Request("http://localhost/shops/1/photos/2"),
+      { LOADER: { get: loaderGet } as unknown as RinkaWorkerLoader },
+      executionCtx,
+    );
+
+    expect(await res.text()).toBe("sibling-photos");
+    expect(loaderGet).not.toHaveBeenCalled();
+  });
 });
