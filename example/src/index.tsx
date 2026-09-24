@@ -1,13 +1,22 @@
 import { Hono } from "hono";
-import { registerDispatch } from "./generated/dispatch";
+import { dynamic } from "rinka";
+import { aboutRoute } from "./routes/about";
+import { indexRoute } from "./routes/index";
+import { photoRoute } from "./routes/photos";
+import { prefectureRoute } from "./routes/prefectures";
+import { shopRoute } from "./routes/shops";
 
-// Thin gateway: apply edge middleware here (app.use(...)), then let rinka wire
-// every route — inline routes are mounted, dynamic routes delegate to their
-// Worker isolate. The RPC type lives in ./generated/app-type, decoupled from
-// this runtime entry.
-const app = new Hono<{ Bindings: CloudflareBindings }>();
-registerDispatch(app);
+// Thin gateway: apply edge middleware here (app.use(...)), then mount each
+// route. Wrap a route with `dynamic()` to run it in its own Worker isolate;
+// leave it bare to run inline in the host. `AppType` is just the chained app's
+// type, so Hono RPC inference works without any codegen.
+const app = new Hono<{ Bindings: CloudflareBindings }>()
+  .route("/", dynamic(indexRoute, { id: "index", bindings: [] }))
+  .route("/shops", shopRoute)
+  .route("/shops", dynamic(photoRoute, { id: "photos", bindings: [] }))
+  .route("/prefectures", dynamic(prefectureRoute, { id: "prefectures", bindings: [] }))
+  .route("/about", aboutRoute);
 
 export default app;
 
-export type { AppType } from "./generated/app-type";
+export type AppType = typeof app;
