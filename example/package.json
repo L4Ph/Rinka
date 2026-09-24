@@ -8,15 +8,15 @@
     "deploy": "pnpm run build && wrangler deploy"
   },
   "dependencies": {
-    "hono": "^4.12.27",
+    "hono": "catalog:",
     "rinka": "workspace:*"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.43.0",
-    "@cloudflare/workers-types": "^4.20260426.1",
-    "typescript": "^5.9.0",
+    "@cloudflare/vite-plugin": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",
-    "wrangler": "^4.17.0"
+    "wrangler": "catalog:"
   }
 }

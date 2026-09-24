@@ -98,4 +98,4 @@ export type AppType = typeof app; // Hono RPC — no codegen
 
 ## Examples
 
-- [`example/`](./example) — a Hono app on Cloudflare Workers with dynamic routes (`/`, `/shops/:id/photos/:index`, `/prefectures/:prefecture/shops`) and inline routes (`/shops/:id`, `/about`). Run `pnpm install` from the repo root, then `pnpm --filter example dev`.
+- [`example/`](./example) — a **Pokédex** on Cloudflare Workers: dynamic routes (`/` list, `/pokemon/:id` detail + like) run in isolates, an inline route (`/about`) runs in the host, likes are stored in KV via a `ctx.exports` loopback binding, and GET pages use [Workers Cache](https://developers.cloudflare.com/workers/cache/). Run `pnpm install` from the repo root, then `pnpm --filter example dev`.

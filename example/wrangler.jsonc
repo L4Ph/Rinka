@@ -1,12 +1,15 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "example",
-  "compatibility_date": "2025-08-03",
+  "compatibility_date": "2026-08-03",
+  "compatibility_flags": ["enable_ctx_exports"],
   "main": "./src/index.tsx",
   "worker_loaders": [{ "binding": "LOADER" }],
+  "kv_namespaces": [{ "binding": "LIKES_KV", "id": "rinka_example_likes_dev_only" }],
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
     "run_worker_first": true,
   },
+  "cache": { "enabled": true },
 }
