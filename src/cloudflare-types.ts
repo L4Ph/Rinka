@@ -22,7 +22,10 @@ export type RinkaWorkerLoaderStub = {
 };
 
 export type RinkaWorkerLoader = {
-  get(id: string | null, getCode: () => RinkaWorkerLoaderWorkerCode): RinkaWorkerLoaderStub;
+  get(
+    id: string | null,
+    getCode: () => RinkaWorkerLoaderWorkerCode | Promise<RinkaWorkerLoaderWorkerCode>,
+  ): RinkaWorkerLoaderStub;
 };
 
 export type RinkaFetcher = {

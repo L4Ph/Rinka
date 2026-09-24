@@ -1,15 +1,11 @@
 import { Hono, type Context, type Hono as HonoType, type Next } from "hono";
+import type { LoopbackDeclaration } from "../binding";
 import type {
   RinkaCtxExports,
   RinkaExecutionContext,
   RinkaWorkerLoader,
 } from "../cloudflare-types";
-import {
-  delegateDynamicRouteFetch,
-  getDynamicRouteManifest,
-  hasLoaderBindings,
-  type LoaderCapableEnv,
-} from "./loader";
+import { delegateDynamicRouteFetch, hasLoaderBindings, type LoaderCapableEnv } from "./loader";
 
 /** Bindings type of a Hono route (`Hono<{ Bindings: B }>` → `B`). */
 type HonoBindingsOf<T> =
@@ -21,12 +17,15 @@ type HonoBindingsOf<T> =
 
 /**
  * `bindings` is constrained to the route's declared `Bindings` keys, so a
- * typo'd binding name fails the host's typecheck. Routes without a `Bindings`
- * type fall back to arbitrary strings (still validated at build time).
+ * typo'd env binding fails the host's typecheck. `loopbacks` names are arbitrary
+ * (they only need to be valid identifiers the isolate reads). The Vite plugin
+ * additionally asserts, at build time, that declared `bindings` cover every
+ * `c.env.*` access and that each loopback `export` exists in the entry module.
  */
 export type DynamicRouteOptions<TBindings = Record<string, unknown>> = {
   id: string;
   bindings: readonly Extract<keyof TBindings, string>[];
+  loopbacks?: Readonly<Record<string, LoopbackDeclaration>>;
 };
 
 function rewriteRequestForMount(request: Request, mountPrefix: string): Request {
@@ -38,7 +37,7 @@ function rewriteRequestForMount(request: Request, mountPrefix: string): Request 
 
 // Hono's `executionCtx` getter throws when no ExecutionContext was provided
 // (e.g. `app.request()` in tests). `exports` itself is also absent unless the
-// host runs with the `enable_ctx_exports` compatibility flag — proxy-mode
+// host runs with the `enable_ctx_exports` compatibility flag — loopback-mode
 // bindings surface a descriptive error from resolveLoaderEnv in that case.
 function getCtxExports(c: Context): RinkaCtxExports | undefined {
   try {
@@ -80,9 +79,8 @@ export function dynamic<T extends HonoType<any, any, any>>(
   type E = T extends HonoType<infer Env, any, any> ? Env : never;
   const wrapper = new Hono<E>();
   const maybeDelegate = async (c: Context<E>, next: Next) => {
-    const entry = getDynamicRouteManifest()[options.id];
     const env = c.env as LoaderCapableEnv;
-    if (entry && hasLoaderBindings(env)) {
+    if (hasLoaderBindings(env)) {
       const mountPrefix = c.req.routePath.replace(/\/\*$/, "");
       const request = rewriteRequestForMount(c.req.raw, mountPrefix);
       if (!routeHandlesRequest(route, c.req.method, new URL(request.url).pathname)) {
@@ -93,7 +91,8 @@ export function dynamic<T extends HonoType<any, any, any>>(
         env: env as LoaderCapableEnv & { LOADER: RinkaWorkerLoader },
         exports: getCtxExports(c),
         routeId: options.id,
-        entry,
+        bindings: options.bindings,
+        loopbacks: options.loopbacks,
         inlineFetch: async () => {
           await next();
           if (!c.res) {

@@ -8,7 +8,7 @@ import {
   readStringLiteral,
   walkModule,
 } from "./ast";
-import { resolveModuleFile } from "./resolve-module";
+import { isLocalSpecifier, resolveModuleFile } from "./resolve-module";
 
 type EnvUsageAnalysis = {
   accessed: Set<string>;
@@ -166,23 +166,13 @@ function analyzeProgram(source: string, filename = "module.ts"): EnvUsageAnalysi
   return analyzeProgramNode(parseModuleSource(source, filename));
 }
 
-function isLocalSpecifier(spec: string, pathAliases: Record<string, string>): boolean {
-  if (spec.startsWith(".")) return true;
-  for (const alias of Object.keys(pathAliases)) {
-    const prefix = alias.endsWith("*") ? alias.slice(0, -1) : alias;
-    if (prefix.length > 0 && spec.startsWith(prefix)) return true;
-  }
-  return false;
-}
-
 /**
  * Env access of a route module *and* the local modules it imports (middleware,
  * helpers). A route delivered to an isolate carries its imported middleware, so
  * a binding that only a `.use()`'d middleware touches still has to be declared.
  * Only relative / path-aliased imports are followed — third-party packages are
  * left alone. Cycles are guarded by a visited set.
- */
-export function collectEnvAccessDeep(
+ */ export function collectEnvAccessDeep(
   entryPath: string,
   pathAliases: Record<string, string> = {},
 ): EnvUsageAnalysis {

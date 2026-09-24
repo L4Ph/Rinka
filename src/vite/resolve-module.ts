@@ -46,3 +46,13 @@ export function defaultPathAliases(root: string): Record<string, string> {
     "@/*": `${resolve(root, "src")}/*`,
   };
 }
+
+/** Whether an import specifier points at a local (relative or path-aliased) module. */
+export function isLocalSpecifier(spec: string, pathAliases: Record<string, string>): boolean {
+  if (spec.startsWith(".")) return true;
+  for (const alias of Object.keys(pathAliases)) {
+    const prefix = alias.endsWith("*") ? alias.slice(0, -1) : alias;
+    if (prefix.length > 0 && spec.startsWith(prefix)) return true;
+  }
+  return false;
+}
