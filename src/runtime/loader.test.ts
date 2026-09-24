@@ -122,7 +122,9 @@ describe("delegateDynamicRouteFetch", () => {
   it("fetches the route code from ASSETS and hands it to the Worker Loader entrypoint", async () => {
     const { loader, loaderGet, loaderFetch, getLoadedCode } = loaderSpy();
     const assetsFetch = vi.fn(async (input: RequestInfo | URL) => {
-      expect(new URL(String(input)).pathname).toBe("/dynamic-routes/ping.js");
+      const url =
+        input instanceof URL ? input : new URL(typeof input === "string" ? input : input.url);
+      expect(url.pathname).toBe("/dynamic-routes/ping.js");
       return new Response('export default { fetch() { return new Response("loaded"); } }');
     });
     const assets = { fetch: assetsFetch } as RinkaFetcher;

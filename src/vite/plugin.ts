@@ -102,11 +102,10 @@ async function runRinkaCodegen(
 
   for (const route of routes) {
     const source = readFileSync(route.modulePath, "utf8");
-    assertDeclaredBindingsCoverEnvAccessDeep(
-      route.modulePath,
-      route.bindings,
-      resolved.pathAliases,
-    );
+    // Loopback names are delivered too (as ctx.exports stubs), so `c.env.X`
+    // access to either kind of declaration is covered.
+    const declared = [...route.bindings, ...route.loopbacks.map((loopback) => loopback.name)];
+    assertDeclaredBindingsCoverEnvAccessDeep(route.modulePath, declared, resolved.pathAliases);
     assertDynamicRouteAllowed(source, route.modulePath);
   }
 
