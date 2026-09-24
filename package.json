@@ -30,14 +30,14 @@
     "test:watch": "vp test"
   },
   "dependencies": {
-    "oxc-parser": "^0.127.0",
+    "oxc-parser": "^0.151.0",
     "vite-plus": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260426.1",
+    "@cloudflare/workers-types": "^5.20260924.1",
     "@types/node": "^24.12.4",
     "hono": "^4.12.18",
-    "typescript": "^5.9.0",
+    "typescript": "^7.0.2",
     "vite": "catalog:"
   },
   "peerDependencies": {

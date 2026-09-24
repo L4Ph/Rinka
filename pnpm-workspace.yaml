@@ -7,8 +7,8 @@ allowBuilds:
   workerd: true
 
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@0.2.2
-  vite-plus: 0.2.2
+  vite: npm:@voidzero-dev/vite-plus-core@0.3.3
+  vite-plus: 0.3.3
 minimumReleaseAgeExclude:
   - "@voidzero-dev/vite-plus-core@0.2.2"
   - "@voidzero-dev/vite-plus-darwin-arm64@0.2.2"
@@ -20,10 +20,11 @@ minimumReleaseAgeExclude:
   - "@voidzero-dev/vite-plus-win32-arm64-msvc@0.2.2"
   - "@voidzero-dev/vite-plus-win32-x64-msvc@0.2.2"
   - vite-plus@0.2.2
+  - '@cloudflare/workers-types@5.20260924.1'
 overrides:
-  vite: "catalog:"
+  vite@*: 'catalog:'
 peerDependencyRules:
   allowAny:
     - vite
   allowedVersions:
-    vite: "*"
+    vite: '*'

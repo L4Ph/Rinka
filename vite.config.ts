@@ -12,6 +12,7 @@ export default defineConfig({
     },
   },
   pack: {
+    deps: { resolveDepSubpath: true },
     entry: ["src/index.ts", "src/proxies.ts", "src/vite/plugin.ts"],
   },
   staged: {
