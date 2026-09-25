@@ -13,7 +13,7 @@ export default defineConfig({
   },
   pack: {
     deps: { resolveDepSubpath: true },
-    entry: ["src/index.ts", "src/proxies.ts", "src/vite/plugin.ts"],
+    entry: ["src/index.ts", "src/vite/plugin.ts"],
   },
   staged: {
     "*.{js,ts,tsx,vue,svelte,md,json}": "vp check --fix",

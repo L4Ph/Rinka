@@ -9,6 +9,11 @@ allowBuilds:
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@0.3.3
   vite-plus: 0.3.3
+  hono: 4.12.27
+  "@cloudflare/vite-plugin": 1.59.0
+  "@cloudflare/workers-types": 5.20260924.1
+  typescript: 7.0.2
+  wrangler: 4.138.0
 minimumReleaseAgeExclude:
   - "@voidzero-dev/vite-plus-core@0.2.2"
   - "@voidzero-dev/vite-plus-darwin-arm64@0.2.2"
@@ -21,6 +26,9 @@ minimumReleaseAgeExclude:
   - "@voidzero-dev/vite-plus-win32-x64-msvc@0.2.2"
   - vite-plus@0.2.2
   - '@cloudflare/workers-types@5.20260924.1'
+  - '@cloudflare/vite-plugin@1.59.0'
+  - miniflare@5.20260921.1-alpha
+  - wrangler@4.138.0
 overrides:
   vite@*: 'catalog:'
 peerDependencyRules:
